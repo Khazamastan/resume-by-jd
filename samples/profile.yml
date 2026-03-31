@@ -1,0 +1,48 @@
+name: Alex Taylor
+headline: Senior Software Engineer
+contact:
+  email: alex.taylor@email.com
+  phone: +1-555-123-4567
+  location: San Francisco, CA
+summary:
+  - Full-stack engineer with 8+ years of experience building data-intensive web apps.
+  - Passionate about clean architecture, automation, and collaborative delivery.
+experience:
+  - company: TechNova
+    role: Senior Software Engineer
+    location: Remote
+    start: 2019-04-01
+    end: Present
+    bullets:
+      - Led migration of monolith services to event-driven microservices using Kafka.
+      - Reduced CI times by 45% by implementing parallelized build pipelines.
+  - company: BrightApps
+    role: Software Engineer
+    location: Austin, TX
+    start: 2015-06-01
+    end: 2019-03-01
+    bullets:
+      - Built customer analytics dashboards with React and D3.
+      - Introduced automated testing suite that cut production bugs by 30%.
+education:
+  - institution: University of Texas at Austin
+    degree: B.S. Computer Science
+    end: 2015-05-01
+projects:
+  - name: Real-time Alerting Platform
+    summary: Event-driven alerts for IoT devices
+    technologies:
+      - Python
+      - FastAPI
+      - AWS Lambda
+    bullets:
+      - Implemented streaming analytics with Apache Flink to detect anomalies.
+certifications:
+  - name: AWS Certified Solutions Architect
+    issuer: Amazon Web Services
+skills:
+  - Python
+  - FastAPI
+  - React
+  - AWS
+  - PostgreSQL

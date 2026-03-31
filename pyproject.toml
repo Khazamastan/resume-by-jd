@@ -1,0 +1,30 @@
+[project]
+name = "resume-by-jd"
+version = "0.1.0"
+description = "Resume builder that adapts a reference resume to a job description."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "reportlab>=4.0",
+  "pdfplumber>=0.11",
+  "pypdf>=3.9",
+  "pyyaml>=6.0",
+  "python-dateutil>=2.8",
+  "aiofiles>=23.2",
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "python-multipart>=0.0.7",
+]
+
+[project.scripts]
+resume-by-jd = "resume_builder.cli:main"
+resume-by-jd-api = "resume_builder.api:run"
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+]
+
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"

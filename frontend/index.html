@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Resume by Job Description</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <h1>Resume by Job Description</h1>
+      <p>Generate a tailored resume PDF by combining your reference resume, structured profile, and target job description.</p>
+    </header>
+
+    <section class="card">
+      <form id="resume-form" class="form-grid">
+        <div class="field">
+          <label for="reference">Reference Resume (PDF) *</label>
+          <input type="file" id="reference" name="reference" accept="application/pdf" required>
+        </div>
+
+        <div class="field">
+          <label for="profile">Profile Data (YAML or JSON) *</label>
+          <input type="file" id="profile" name="profile" accept=".yml,.yaml,.json" required>
+          <small>Start from <code>samples/profile.yml</code> in the repository.</small>
+        </div>
+
+        <div class="field">
+          <label for="jobText">Job Description (paste text)</label>
+          <textarea id="jobText" name="job_text" placeholder="Paste a job description or upload a .txt file below"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="jobFile">Job Description File (TXT)</label>
+          <input type="file" id="jobFile" name="job_description" accept=".txt">
+          <small>Use either pasted text or a file upload.</small>
+        </div>
+
+        <div class="actions">
+          <button type="submit" id="submit-btn">Generate Resume</button>
+          <button type="reset" class="secondary">Reset</button>
+        </div>
+      </form>
+      <p class="hint">Tip: Keep the API server running with <code>resume-by-jd-api</code>, then open this page at <code>http://localhost:8000/</code>.</p>
+    </section>
+
+    <section class="card" id="status-card" hidden>
+      <h2>Status</h2>
+      <p id="status-message"></p>
+      <div id="error-details" class="error" hidden></div>
+      <iframe id="preview-frame" title="Resume preview" hidden></iframe>
+      <a id="download-link" class="download" download="resume.pdf">Download PDF</a>
+    </section>
+  </main>
+
+  <script src="/static/app.js" type="module"></script>
+</body>
+</html>

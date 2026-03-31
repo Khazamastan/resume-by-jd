@@ -1,0 +1,15 @@
+We are seeking a Senior Backend Engineer to join our platform team.
+
+Responsibilities:
+- Design and implement microservices in Python and FastAPI.
+- Build data pipelines leveraging AWS services and event-driven architectures.
+- Collaborate with frontend teams working in React.
+
+Required Qualifications:
+- 6+ years of professional software engineering experience.
+- Must have hands-on experience with AWS Lambda, DynamoDB, and Kafka.
+- Required skills: CI/CD automation, infrastructure as code, PostgreSQL.
+
+Preferred Qualifications:
+- Nice to have: Experience with Terraform, Kubernetes, and data streaming (Flink or Spark).
+- Bonus: Exposure to machine learning workflows.
