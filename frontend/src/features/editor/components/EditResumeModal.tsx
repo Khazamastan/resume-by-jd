@@ -30,10 +30,16 @@ import {
   useToast,
   VStack,
 } from '@chakra-ui/react';
-import type { Control, UseFormRegister, UseFormWatch } from 'react-hook-form';
-import { Controller, useFieldArray, useForm } from 'react-hook-form';
-import { FiPlus, FiTrash2 } from 'react-icons/fi';
 import { useEffect } from 'react';
+import {
+  type Control,
+  Controller,
+  useFieldArray,
+  useForm,
+  type UseFormRegister,
+  type UseFormWatch,
+} from 'react-hook-form';
+import { FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import { mapFormToSections, mapSectionsToForm, ResumeEditorFormValues, SectionKind } from '@/features/editor/types/formTypes';
 import type { ResumeDocumentPayload, ResumeSection } from '@/features/shared/types';

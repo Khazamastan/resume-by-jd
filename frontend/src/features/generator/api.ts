@@ -1,5 +1,5 @@
-import api from '@/lib/api';
 import type { ResumeDocumentPayload } from '@/features/shared/types';
+import api from '@/lib/api';
 
 export interface GenerateResumeParams {
   reference: File;

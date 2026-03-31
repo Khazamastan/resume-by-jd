@@ -9,7 +9,6 @@ import {
   ButtonGroup,
   Flex,
   Heading,
-  HStack,
   Icon,
   SimpleGrid,
   Stack,
@@ -22,11 +21,11 @@ import { useCallback, useEffect } from 'react';
 import { FiArrowRight, FiRefreshCcw } from 'react-icons/fi';
 
 import { EditResumeModal } from '@/features/editor/components/EditResumeModal';
-import type { ResumeSection } from '@/features/shared/types';
-import { GenerateResumeParams, buildDownloadName } from '@/features/generator/api';
+import { buildDownloadName,GenerateResumeParams } from '@/features/generator/api';
 import { GeneratorForm } from '@/features/generator/components/GeneratorForm';
 import { ResumePreview } from '@/features/generator/components/ResumePreview';
 import { useResumeSession } from '@/features/generator/useResumeSession';
+import type { ResumeSection } from '@/features/shared/types';
 import { ThemeSettingsMenu } from '@/theme/ThemeSettingsMenu';
 
 interface AppHeaderProps {

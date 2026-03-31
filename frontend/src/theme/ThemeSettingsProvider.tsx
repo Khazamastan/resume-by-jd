@@ -1,7 +1,7 @@
 import { ChakraProvider, ColorModeScript } from '@chakra-ui/react';
-import { PropsWithChildren, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { accentOptions, AccentKey, createAppTheme, defaultAccent, type AccentOption } from './index';
+import { AccentKey, type AccentOption,accentOptions, createAppTheme, defaultAccent } from './index';
 
 interface ThemeSettingsContextValue {
   accent: AccentKey;

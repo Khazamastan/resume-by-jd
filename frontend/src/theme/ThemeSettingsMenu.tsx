@@ -8,7 +8,6 @@ import {
   MenuGroup,
   MenuItem,
   MenuList,
-  Stack,
   Text,
   Tooltip,
   useColorMode,
@@ -39,29 +38,26 @@ export function ThemeSettingsMenu() {
           </MenuItem>
         </MenuGroup>
         <MenuGroup title="Accent">
-          <Stack spacing={2} px={2} py={1}>
-            {accentOptions.map((option) => {
-              const isActive = accent === option.key;
-              return (
-                <MenuItem
-                  key={option.key}
-                  onClick={() => setAccent(option.key)}
-                  icon={isActive ? <Icon as={FiCheck} /> : <Box boxSize={3} borderRadius="full" bg={option.swatch} />}
-                  closeOnSelect
-                >
-                  <HStack spacing={3}>
-                    <Box boxSize={4} borderRadius="full" bg={option.swatch} />
-                    <Stack spacing={0}>
-                      <Text fontWeight="semibold">{option.label}</Text>
-                      <Text fontSize="xs" color="text.muted">
-                        {option.description}
-                      </Text>
-                    </Stack>
-                  </HStack>
-                </MenuItem>
-              );
-            })}
-          </Stack>
+          {accentOptions.map((option) => {
+            const isActive = accent === option.key;
+            return (
+              <MenuItem
+                key={option.key}
+                onClick={() => setAccent(option.key)}
+                icon={isActive ? <Icon as={FiCheck} /> : <Box boxSize={3} borderRadius="full" bg={option.swatch} />}
+              >
+                <HStack spacing={3}>
+                  <Box boxSize={4} borderRadius="full" bg={option.swatch} />
+                  <Box>
+                    <Text fontWeight="semibold">{option.label}</Text>
+                    <Text fontSize="xs" color="text.muted">
+                      {option.description}
+                    </Text>
+                  </Box>
+                </HStack>
+              </MenuItem>
+            );
+          })}
         </MenuGroup>
       </MenuList>
     </Menu>

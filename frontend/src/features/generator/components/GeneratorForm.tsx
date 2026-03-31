@@ -57,25 +57,22 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
   });
   const [hasSubmitted, setHasSubmitted] = useBoolean();
 
-  const submit = useCallback(
-    handleSubmit(async (values) => {
-      const reference = fileFromList(values.reference);
-      const profile = fileFromList(values.profile);
+  const submit = handleSubmit(async (values) => {
+    const reference = fileFromList(values.reference);
+    const profile = fileFromList(values.profile);
 
-      if (!reference || !profile) {
-        return;
-      }
+    if (!reference || !profile) {
+      return;
+    }
 
-      await onGenerate({
-        reference,
-        profile,
-        jobDescriptionFile: fileFromList(values.jobDescriptionFile ?? null) ?? undefined,
-        jobText: values.jobText?.trim() ? values.jobText.trim() : undefined,
-      });
-      setHasSubmitted.on();
-    }),
-    [handleSubmit, onGenerate, setHasSubmitted],
-  );
+    await onGenerate({
+      reference,
+      profile,
+      jobDescriptionFile: fileFromList(values.jobDescriptionFile ?? null) ?? undefined,
+      jobText: values.jobText?.trim() ? values.jobText.trim() : undefined,
+    });
+    setHasSubmitted.on();
+  });
 
   const handleReset = useCallback(() => {
     reset();

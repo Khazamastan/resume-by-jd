@@ -1,8 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
-import type { ResumeDocumentPayload, ResumeSection } from '@/features/shared/types';
 import { generateResume, GenerateResumeParams, updateResume } from '@/features/generator/api';
+import type { ResumeDocumentPayload, ResumeSection } from '@/features/shared/types';
 
 export interface UpdateResumeArgs {
   resumeId: string;
