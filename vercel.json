@@ -1,4 +1,9 @@
 {
   "buildCommand": "yarn --cwd frontend install --frozen-lockfile && yarn --cwd frontend build",
-  "outputDirectory": "frontend/dist"
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.11"
+    }
+  }
 }
