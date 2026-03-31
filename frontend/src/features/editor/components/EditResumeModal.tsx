@@ -217,6 +217,8 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
   );
 }
 
+type SectionPath = `sections.${number}`;
+
 interface SectionEditorProps {
   control: Control<ResumeEditorFormValues>;
   register: UseFormRegister<ResumeEditorFormValues>;
@@ -226,8 +228,11 @@ interface SectionEditorProps {
 }
 
 function SectionEditor({ control, register, watch, index, onRemove }: SectionEditorProps) {
-  const path = `sections.${index}`;
-  const kind = watch(`${path}.kind`);
+  const path = `sections.${index}` as SectionPath;
+  const section = watch(path) as ResumeEditorFormValues['sections'][number] | undefined;
+  const kind = section?.kind ?? SectionKind.Generic;
+  const sectionTitle = section?.title ?? '';
+  const experienceValues = section?.experiences ?? [];
 
   const {
     fields: categoryFields,
@@ -235,7 +240,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
     remove: removeCategory,
   } = useFieldArray({
     control,
-    name: `${path}.categoryLines`,
+    name: `${path}.categoryLines` as const,
   });
 
   const {
@@ -244,7 +249,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
     remove: removeExperience,
   } = useFieldArray({
     control,
-    name: `${path}.experiences`,
+    name: `${path}.experiences` as const,
   });
 
   return (
@@ -252,7 +257,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
       <HStack justify="space-between" align="flex-start" mb={4}>
         <VStack align="flex-start" spacing={0}>
           <Heading fontSize="lg" color="text.primary">
-            {watch(`${path}.title`) || 'Untitled Section'}
+            {sectionTitle || 'Untitled Section'}
           </Heading>
           <Text fontSize="xs" textTransform="uppercase" letterSpacing="widest" color="text.muted">
             {kind}
@@ -293,7 +298,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
                 />
                 <Controller
                   control={control}
-                  name={`${path}.categoryLines.${idx}.items`}
+                  name={`${path}.categoryLines.${idx}.items` as const}
                   render={({ field: controllerField }) => (
                     <Textarea
                       placeholder="Skills (comma separated)"
@@ -326,7 +331,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
                   {experienceFields.length > 0 ? (
                     experienceFields.map((field, idx) => (
                       <Tab key={field.id} whiteSpace="nowrap">
-                        {watch(`${path}.experiences.${idx}.role`) || `Experience ${idx + 1}`}
+                        {experienceValues[idx]?.role || `Experience ${idx + 1}`}
                       </Tab>
                     ))
                   ) : (
