@@ -1,9 +1,4 @@
 {
   "buildCommand": "yarn --cwd frontend install --frozen-lockfile && yarn --cwd frontend build",
-  "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/index.py": {
-      "runtime": "vercel-python@4.7.2"
-    }
-  }
+  "outputDirectory": "frontend/dist"
 }
