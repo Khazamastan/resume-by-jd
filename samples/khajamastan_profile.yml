@@ -1,0 +1,89 @@
+name: Khajamastan Bellamkonda
+headline: Principal Member Technical Staff
+contact:
+  phone: "+91-7207810602"
+  email: khazamastan@gmail.com
+  location: Bangalore, India
+summary:
+  - Seasoned front-end and full-stack engineer with 10+ years architecting high-availability identity, compensation, and e-commerce platforms for global product organizations.
+  - Passionate about translating complex requirements into performant experiences that boost customer engagement and developer velocity.
+skills:
+  - Programming Languages: JavaScript (ES6+), TypeScript, Node.js, HTML5, CSS3, SQL, NoSQL
+  - Frameworks & Libraries: React, Redux, MobX, Angular, Webpack, Cypress, Jest, React Testing Library, Styled Components, MAUI
+  - Cloud & DevOps: OCI, AWS, CI/CD (TeamCity, GitHub Actions, OCI DevOps), Docker, Micro Front-Ends, Module Federation
+  - Tools: Git, VS Code, Visual Studio, Eclipse, Figma, Web Accessibility Tooling
+  - Domains: Identity & Access Management, Incentive Compensation, Cybersecurity Dashboards, ML-Driven Personalization
+experience:
+  - company: Oracle
+    role: Principal Member Technical Staff
+    location: Bangalore, India
+    start: 2022-04-01
+    bullets:
+      - Revitalized Redwood-themed notification templates and Alloy customization, boosting customer engagement by 20%.
+      - Implemented cross-region disaster recovery workflows that guaranteed 100% operational continuity during failovers.
+      - Bootstrapped MAUI-based Identity console modernization, trimming maintenance effort by 40% and accelerating feature delivery by 30%.
+      - Redesigned MFA consent flows and admin alerts, strengthening security posture and protecting multimillion-dollar OCI accounts.
+      - Migrated 20+ TeamCity pipelines to OCI DevOps with unified canary health checks, cutting deployment issues by 35%.
+      - Consolidated fragmented profile experiences into reusable React modules, reducing net-new UI development by 60%.
+      - Integrated Apple as a Social IDP, expanding login options and improving completion rates across key regions.
+      - Authored functional specs and expanded automated test coverage from 39% to 70% using React Testing Library and Jest.
+  - company: Xactly Corp
+    role: Senior Software Developer
+    location: Bangalore, India
+    start: 2021-06-01
+    end: 2022-04-01
+    bullets:
+      - Optimized front-end build pipeline via Webpack code splitting, shortening load times by 20–30%.
+      - Spearheaded Objectives product in React and TypeScript, standing up CI/CD and E2E automation that reduced release regressions by 45%.
+      - Delivered Incent module enhancements across React, Node.js, and Angular, unlocking new compensation scenarios for enterprise clients.
+      - Engineered a config-driven UI framework that cut feature rollout time by 35% across product squads.
+  - company: Tesco (Nineleaps)
+    role: Software Development Engineer II
+    location: Bangalore, India
+    start: 2020-05-01
+    end: 2021-06-01
+    bullets:
+      - Architected micro front-end migration with Module Federation, enabling zero-downtime integration of partner experiences.
+      - Built a config-based React component factory powering Interview, Onboarding, and Performance modules, trimming delivery cycles by 30%.
+      - Automated CI/CD pipelines and Cypress suites, elevating release confidence and reducing production defects by 25%.
+  - company: PWC SDC
+    role: Senior Software Engineer
+    location: Bangalore, India
+    start: 2018-07-01
+    end: 2020-05-01
+    bullets:
+      - Led design of cybersecurity digital-risk dashboards for Fortune 500 firms, driving adoption across 12 enterprise accounts.
+      - Migrated a legacy Aurelia platform to React, improving developer throughput by 40% and modernizing UX.
+      - Replatformed build assets with Webpack, shrinking bundle size by 50% and cutting load latency by 35%.
+  - company: Minewhat Inc
+    role: Senior Front-End Developer
+    location: Bangalore, India
+    start: 2016-08-01
+    end: 2018-07-01
+    bullets:
+      - Engineered ML-driven recommendation widgets and banners in React and MobX, increasing conversion lift by 18% for flagship retailers.
+      - Created a live visual editor with theme-aware controls, empowering customers to customize experiences without engineering support.
+      - Produced slider frameworks, placement tooling, and SVG templating that reduced campaign launch times by 45%.
+  - company: Thrymr Software
+    role: UI Developer
+    location: Bangalore, India
+    start: 2015-02-01
+    end: 2016-08-01
+    bullets:
+      - Developed the iStyle room designer with Fabric.js and Angular, enabling interactive demos that raised attachment rates by 22%.
+      - Built an internal collaboration portal streamlining notifications, attendance, and leave workflows for 200+ employees.
+      - Implemented a weight-loss program dashboard with recipe builder and analytics, boosting user retention by 15%.
+projects:
+  - name: Realtime Collaboration Platform
+    summary: Slack-like chat experience built with vanilla JavaScript, Node.js, and WebSockets handling sub-200 ms messaging.
+    bullets:
+      - Implemented real-time notifications, file sharing, and user tagging to support 5,000 concurrent channels with minimal latency.
+  - name: National Digital Identity Features
+    summary: UI delivery for Identity Proofing, Credential Types, and Digital Wallet within OCI.
+    bullets:
+      - Coordinated cross-functional design reviews that accelerated launch timelines by four weeks while maintaining regulatory compliance.
+education:
+  - institution: Rajiv Gandhi University of Knowledge Technologies
+    degree: B.Tech, Mechanical Engineering
+    location: R.K. Valley, Andhra Pradesh
+    end: 2014-05-01

@@ -1,8 +1,36 @@
+# OS / Editor
+.DS_Store
+.idea/
+.vscode/
+
+# Python
 __pycache__/
 *.pyc
-.tmp/
-output/
+*.pyo
+*.pyd
+.Python
+.venv/
+env/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+.npm/
+.pnpm-debug.log
+*.log
+*.lock-wip
+
+# Testing / Coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Misc
+.cache/
 tmp/
-.env
-.venv
-*.pdf
+*.sw?
