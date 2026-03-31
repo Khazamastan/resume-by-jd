@@ -1,0 +1,4 @@
+{
+  "buildCommand": "yarn --cwd frontend install --frozen-lockfile && yarn --cwd frontend build",
+  "outputDirectory": "frontend/dist"
+}
