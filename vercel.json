@@ -1,5 +1,4 @@
 {
   "buildCommand": "yarn --cwd frontend install --frozen-lockfile && yarn --cwd frontend build",
-  "installCommand": "pip install -r requirements.txt",
   "outputDirectory": "frontend/dist"
 }
