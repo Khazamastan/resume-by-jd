@@ -4,15 +4,15 @@ contact:
   phone: "+91-7207810602"
   email: khazamastan@gmail.com
   location: Bangalore, India
+  linkedin: https://www.linkedin.com/in/khazamastan
 summary:
   - Seasoned front-end and full-stack engineer with 10+ years architecting high-availability identity, compensation, and e-commerce platforms for global product organizations.
   - Passionate about translating complex requirements into performant experiences that boost customer engagement and developer velocity.
 skills:
-  - Programming Languages: JavaScript (ES6+), TypeScript, Node.js, HTML5, CSS3, SQL, NoSQL
-  - Frameworks & Libraries: React, Redux, MobX, Angular, Webpack, Cypress, Jest, React Testing Library, Styled Components, MAUI
-  - Cloud & DevOps: OCI, AWS, CI/CD (TeamCity, GitHub Actions, OCI DevOps), Docker, Micro Front-Ends, Module Federation
-  - Tools: Git, VS Code, Visual Studio, Eclipse, Figma, Web Accessibility Tooling
-  - Domains: Identity & Access Management, Incentive Compensation, Cybersecurity Dashboards, ML-Driven Personalization
+  - Frontend: React, Redux, MobX, Angular, Next.js, Micro Front-Ends, HTML5, CSS3, Tailwind CSS, Webpack, Vite, Styled Components
+  - Backend: Node.js, Express, GraphQL, REST APIs, Python (FastAPI), Java (Spring Boot), PostgreSQL, DynamoDB
+  - Testing & DevOps: Jest, React Testing Library, Cypress, Playwright, GitHub Actions, TeamCity, Docker, Kubernetes, Terraform
+  - AI Tools: GitHub Copilot, OpenAI Codex, Cline
 experience:
   - company: Oracle
     role: Principal Member Technical Staff
@@ -37,7 +37,7 @@ experience:
       - Spearheaded Objectives product in React and TypeScript, standing up CI/CD and E2E automation that reduced release regressions by 45%.
       - Delivered Incent module enhancements across React, Node.js, and Angular, unlocking new compensation scenarios for enterprise clients.
       - Engineered a config-driven UI framework that cut feature rollout time by 35% across product squads.
-  - company: Tesco (Nineleaps)
+  - company: Nineleaps
     role: Software Development Engineer II
     location: Bangalore, India
     start: 2020-05-01
@@ -46,7 +46,7 @@ experience:
       - Architected micro front-end migration with Module Federation, enabling zero-downtime integration of partner experiences.
       - Built a config-based React component factory powering Interview, Onboarding, and Performance modules, trimming delivery cycles by 30%.
       - Automated CI/CD pipelines and Cypress suites, elevating release confidence and reducing production defects by 25%.
-  - company: PWC SDC
+  - company: PWC
     role: Senior Software Engineer
     location: Bangalore, India
     start: 2018-07-01

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import re
 import statistics
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,19 +26,69 @@ class _Line:
 def _color_to_hex(color: Iterable[float] | None) -> str:
     if not color:
         return "#000000"
-    values = list(color)
+    if isinstance(color, str):
+        candidate = color.strip()
+        if re.fullmatch(r"#?[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?", candidate):
+            if not candidate.startswith("#"):
+                candidate = f"#{candidate}"
+            if len(candidate) == 4:
+                candidate = "#" + "".join(ch * 2 for ch in candidate[1:])
+            return candidate.lower()
+        return "#000000"
+    if isinstance(color, (int, float)):
+        value = float(color)
+        if value <= 1:
+            value *= 255
+        gray = max(0, min(255, int(round(value))))
+        return f"#{gray:02x}{gray:02x}{gray:02x}"
+    try:
+        values = list(color)
+    except TypeError:
+        return "#000000"
     if not values:
         return "#000000"
     if len(values) == 1:
         values = values * 3
-    if all(v <= 1 for v in values):
-        rgb = [max(0, min(255, int(round(v * 255)))) for v in values[:3]]
+    if all(isinstance(v, (int, float)) and v <= 1 for v in values[:3]):
+        rgb = [max(0, min(255, int(round(float(v) * 255)))) for v in values[:3]]
     else:
-        rgb = [max(0, min(255, int(round(v)))) for v in values[:3]]
+        rgb = [max(0, min(255, int(round(float(v))))) for v in values[:3]]
     return f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
 
 
-def _infer_theme(chars: List[Dict[str, object]], page_width: float, page_height: float) -> Theme:
+def _hex_to_rgb(value: str) -> Tuple[float, float, float]:
+    hex_value = value.lstrip("#")
+    if len(hex_value) == 3:
+        hex_value = "".join(ch * 2 for ch in hex_value)
+    if len(hex_value) != 6:
+        return 0.0, 0.0, 0.0
+    r = int(hex_value[0:2], 16) / 255.0
+    g = int(hex_value[2:4], 16) / 255.0
+    b = int(hex_value[4:6], 16) / 255.0
+    return r, g, b
+
+
+def _is_accent_candidate(color_hex: str, primary_hex: str) -> bool:
+    if not color_hex or color_hex == "#000000":
+        return False
+    if color_hex.lower() == (primary_hex or "").lower():
+        return False
+    red, green, blue = _hex_to_rgb(color_hex)
+    span = max(red, green, blue) - min(red, green, blue)
+    luminance = (0.299 * red) + (0.587 * green) + (0.114 * blue)
+    if span < 0.08:
+        return False
+    if luminance < 0.10 or luminance > 0.96:
+        return False
+    return True
+
+
+def _infer_theme(
+    chars: List[Dict[str, object]],
+    page_width: float,
+    page_height: float,
+    graphic_colors: List[str] | None = None,
+) -> Theme:
     if not chars:
         return Theme()
 
@@ -59,7 +110,26 @@ def _infer_theme(chars: List[Dict[str, object]], page_width: float, page_height:
     body_font = _dominant([font for font, size in zip(fonts, sizes) if size <= body_size + 0.5]) or "Helvetica"
     heading_font = _dominant([font for font, size in zip(fonts, sizes) if size >= heading_size - 1])
     primary_color = _color_to_hex(colors[0]) if colors else "#000000"
-    accent_color = _color_to_hex(colors[1]) if len(colors) > 1 else primary_color
+    accent_color = primary_color
+
+    if graphic_colors:
+        color_counts: Dict[str, int] = {}
+        for color_hex in graphic_colors:
+            color_counts[color_hex] = color_counts.get(color_hex, 0) + 1
+        ordered_graphic_colors = [color_hex for color_hex, _ in sorted(color_counts.items(), key=lambda item: item[1], reverse=True)]
+        for color_hex in ordered_graphic_colors:
+            if _is_accent_candidate(color_hex, primary_color):
+                accent_color = color_hex
+                break
+
+    if accent_color == primary_color and len(colors) > 1:
+        fallback_accent = _color_to_hex(colors[1])
+        if _is_accent_candidate(fallback_accent, primary_color):
+            accent_color = fallback_accent
+
+    template = "hackajob"
+    if any("SpaceGroteskLight" in str(font) for font in fonts):
+        template = "hackajob"
 
     return Theme(
         body_font=body_font,
@@ -74,6 +144,7 @@ def _infer_theme(chars: List[Dict[str, object]], page_width: float, page_height:
         margin_bottom=page_height * 0.08,
         page_width=page_width,
         page_height=page_height,
+        template=template,
     )
 
 
@@ -98,7 +169,7 @@ def _collect_lines(words: List[Dict[str, object]]) -> List[_Line]:
         dominant_font = max(set(fonts), key=fonts.count)
         dominant_color = _color_to_hex(colors[0]) if colors else "#000000"
         first_word = group_sorted[0]
-        is_bullet = first_word.get("text", "").startswith(("-", "•", "·"))
+        is_bullet = first_word.get("text", "").startswith(("-", "■", "·"))
         lines.append(
             _Line(
                 page=page,
@@ -134,6 +205,7 @@ def extract_reference_structure(reference_pdf: str | Path) -> ReferenceStructure
     with pdfplumber.open(ref_path) as pdf:
         all_chars: List[Dict[str, object]] = []
         all_words: List[Dict[str, object]] = []
+        graphic_colors: List[str] = []
         for page_index, page in enumerate(pdf.pages):
             for char in page.chars:
                 char = dict(char)
@@ -147,10 +219,19 @@ def extract_reference_structure(reference_pdf: str | Path) -> ReferenceStructure
                 word["page_number"] = page_index + 1
             all_words.extend(words)
 
+            for shape in page.rects + page.curves + page.lines:
+                fill_hex = _color_to_hex(shape.get("non_stroking_color"))
+                stroke_hex = _color_to_hex(shape.get("stroking_color"))
+                if fill_hex != "#000000":
+                    graphic_colors.append(fill_hex)
+                if stroke_hex != "#000000":
+                    graphic_colors.append(stroke_hex)
+
         theme = _infer_theme(
             all_chars,
             pdf.pages[0].width if pdf.pages else 595.0,
             pdf.pages[0].height if pdf.pages else 842.0,
+            graphic_colors=graphic_colors,
         )
 
     lines = _collect_lines(all_words)
@@ -165,7 +246,7 @@ def extract_reference_structure(reference_pdf: str | Path) -> ReferenceStructure
         if not current_section:
             current_section = ResumeSection(title="Summary")
         if line.is_bullet:
-            current_section.bullets.append(line.text.lstrip("-•· ").strip())
+            current_section.bullets.append(line.text.lstrip("-■· ").strip())
         else:
             current_section.paragraphs.append(line.text)
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import yaml
 
@@ -69,3 +70,160 @@ def dump_json(obj: Any, destination: str | Path) -> None:
     dest = Path(destination)
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(json.dumps(obj, indent=2, ensure_ascii=False))
+
+
+def _ordered_contact(contact: Dict[str, str]) -> OrderedDict[str, str]:
+    ordered: OrderedDict[str, str] = OrderedDict()
+    preferred_order = [
+        "phone",
+        "email",
+        "location",
+        "linkedin",
+        "github",
+        "website",
+        "portfolio",
+    ]
+    for key in preferred_order:
+        value = contact.get(key)
+        if value:
+            ordered[key] = value
+    for key, value in contact.items():
+        if key in ordered or not value:
+            continue
+        ordered[key] = value
+    return ordered
+
+
+def _non_empty(values: List[str]) -> List[str]:
+    return [value for value in values if value]
+
+
+def _canonical_experience(items: List[Dict[str, Any]]) -> List[OrderedDict[str, Any]]:
+    entries: List[OrderedDict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        entry: OrderedDict[str, Any] = OrderedDict()
+        for key in ("company", "role", "location", "start", "end"):
+            value = item.get(key)
+            if value:
+                entry[key] = value
+        bullets = _non_empty(list(item.get("bullets", []) or []))
+        if bullets:
+            entry["bullets"] = bullets
+        if entry:
+            entries.append(entry)
+    return entries
+
+
+def _canonical_education(records: List[Dict[str, Any]]) -> List[OrderedDict[str, Any]]:
+    result: List[OrderedDict[str, Any]] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        entry: OrderedDict[str, Any] = OrderedDict()
+        for key in ("institution", "degree", "location", "start", "end"):
+            value = record.get(key)
+            if value:
+                entry[key] = value
+        details = _non_empty(list(record.get("details", []) or []))
+        if details:
+            entry["details"] = details
+        if entry:
+            result.append(entry)
+    return result
+
+
+def _canonical_projects(projects: List[Dict[str, Any]]) -> List[OrderedDict[str, Any]]:
+    result: List[OrderedDict[str, Any]] = []
+    for project in projects:
+        if not isinstance(project, dict):
+            continue
+        entry: OrderedDict[str, Any] = OrderedDict()
+        for key in ("name", "summary", "description"):
+            value = project.get(key)
+            if value:
+                entry[key] = value
+        technologies = _non_empty(list(project.get("technologies", []) or []))
+        if technologies:
+            entry["technologies"] = technologies
+        bullets = _non_empty(list(project.get("bullets", []) or []))
+        if bullets:
+            entry["bullets"] = bullets
+        if entry:
+            result.append(entry)
+    return result
+
+
+def _canonical_certifications(certifications: List[Dict[str, Any]]) -> List[OrderedDict[str, Any]]:
+    result: List[OrderedDict[str, Any]] = []
+    for cert in certifications:
+        if not isinstance(cert, dict):
+            continue
+        entry: OrderedDict[str, Any] = OrderedDict()
+        for key in ("name", "issuer", "date"):
+            value = cert.get(key)
+            if value:
+                entry[key] = value
+        if entry:
+            result.append(entry)
+    return result
+
+
+def _canonical_additional(sections: List[ResumeSection]) -> List[OrderedDict[str, Any]]:
+    result: List[OrderedDict[str, Any]] = []
+    for section in sections:
+        entry: OrderedDict[str, Any] = OrderedDict()
+        if section.title:
+            entry["title"] = section.title
+        bullets = _non_empty(list(section.bullets))
+        if bullets:
+            entry["bullets"] = bullets
+        paragraphs = _non_empty(list(section.paragraphs))
+        if paragraphs:
+            entry["paragraphs"] = paragraphs
+        if section.meta:
+            entry["meta"] = section.meta
+        if entry:
+            result.append(entry)
+    return result
+
+
+def profile_to_canonical(profile: ResumeProfile) -> OrderedDict[str, Any]:
+    data: OrderedDict[str, Any] = OrderedDict()
+    data["name"] = profile.name
+    if profile.headline:
+        data["headline"] = profile.headline
+    if profile.contact:
+        data["contact"] = _ordered_contact(profile.contact)
+    summary_lines = _non_empty(list(profile.summary))
+    if summary_lines:
+        data["summary"] = summary_lines
+    experience_entries = _canonical_experience(profile.experience)
+    if experience_entries:
+        data["experience"] = experience_entries
+    education_entries = _canonical_education(profile.education)
+    if education_entries:
+        data["education"] = education_entries
+    skills = _non_empty(list(profile.skills))
+    if skills:
+        data["skills"] = skills
+    project_entries = _canonical_projects(profile.projects)
+    if project_entries:
+        data["projects"] = project_entries
+    certification_entries = _canonical_certifications(profile.certifications)
+    if certification_entries:
+        data["certifications"] = certification_entries
+    additional_entries = _canonical_additional(profile.additional_sections)
+    if additional_entries:
+        data["additional_sections"] = additional_entries
+    return data
+
+
+def save_profile(profile: ResumeProfile, destination: str | Path) -> Path:
+    """Persist a resume profile to YAML in the canonical schema."""
+    data = profile_to_canonical(profile)
+    dest = Path(destination)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+    return dest

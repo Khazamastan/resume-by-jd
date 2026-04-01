@@ -7,6 +7,7 @@ A CLI tool that ingests a reference resume and a job description, then produces 
 - Parses job descriptions to identify required and preferred skills.
 - Updates the resume content and skills inventory to reflect the job requirements.
 - Generates a polished PDF that mirrors the reference theme.
+- Auto-detects Hackajob-style references (Space Grotesk template) and renders the card-based layout with matching header/cards/chips/logos.
 
 ## Installation
 ```

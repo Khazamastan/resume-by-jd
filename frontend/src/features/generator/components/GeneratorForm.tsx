@@ -13,6 +13,7 @@ import {
   FormLabel,
   Heading,
   Input,
+  SimpleGrid,
   Stack,
   Text,
   Textarea,
@@ -23,6 +24,8 @@ import { useCallback } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
 import type { GenerateResumeParams } from '@/features/generator/api';
+import { accentOptions, defaultAccent, getAccentHex, type AccentKey } from '@/theme';
+import { useThemeSettings } from '@/theme/ThemeSettingsProvider';
 
 interface GeneratorFormProps {
   onGenerate: (params: GenerateResumeParams) => Promise<void>;
@@ -31,9 +34,10 @@ interface GeneratorFormProps {
 
 interface GeneratorFormValues {
   reference: FileList;
-  profile: FileList;
+  profile?: FileList;
   jobDescriptionFile?: FileList;
   jobText?: string;
+  accentKey: AccentKey;
 }
 
 function fileFromList(list?: FileList | null): File | null {
@@ -44,6 +48,7 @@ function fileFromList(list?: FileList | null): File | null {
 }
 
 export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) {
+  const { accent: currentAccent, setAccent } = useThemeSettings();
   const {
     control,
     register,
@@ -53,6 +58,7 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
   } = useForm<GeneratorFormValues>({
     defaultValues: {
       jobText: '',
+      accentKey: currentAccent ?? defaultAccent,
     },
   });
   const [hasSubmitted, setHasSubmitted] = useBoolean();
@@ -61,15 +67,19 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
     const reference = fileFromList(values.reference);
     const profile = fileFromList(values.profile);
 
-    if (!reference || !profile) {
+    if (!reference) {
       return;
     }
 
+    const selectedAccent = values.accentKey ?? defaultAccent;
+    const accentColor = getAccentHex(selectedAccent);
+
     await onGenerate({
       reference,
-      profile,
+      profile: profile ?? undefined,
       jobDescriptionFile: fileFromList(values.jobDescriptionFile ?? null) ?? undefined,
       jobText: values.jobText?.trim() ? values.jobText.trim() : undefined,
+      accentColor,
     });
     setHasSubmitted.on();
   });
@@ -99,8 +109,8 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
             Upload your baseline files
           </Heading>
           <Text fontSize="sm" color="text.subtle">
-            We copy structure from your reference resume and populate it with profile data before tailoring it to the job
-            description.
+            We copy structure from your reference resume and, if provided, merge in your saved profile before tailoring it
+            to the job description.
           </Text>
         </VStack>
 
@@ -125,23 +135,20 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
             </FormHelperText>
           </FormControl>
 
-          <FormControl isInvalid={Boolean(errors.profile)}>
+          <FormControl>
             <FormLabel fontSize="sm" color="text.subtle">
               Profile (JSON or YAML)
             </FormLabel>
             <Input
               type="file"
               accept=".json,.yaml,.yml,application/json,text/yaml"
-              {...register('profile', {
-                validate: (value) => (value && value.length > 0) || 'Profile file is required.',
-              })}
+              {...register('profile')}
               bg="surface.card"
               borderColor="border.muted"
               _hover={{ borderColor: 'brand.300' }}
             />
-            <FormErrorMessage>{errors.profile?.message}</FormErrorMessage>
             <FormHelperText color="text.muted">
-              Export from Resume-by-JD or upload your saved profile file (JSON or YAML).
+              Optional. Upload a saved profile file to override the inferred details we derive from your reference resume.
             </FormHelperText>
           </FormControl>
 
@@ -197,6 +204,56 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
             </FormHelperText>
           </FormControl>
         </Stack>
+
+        <FormControl>
+          <FormLabel fontSize="sm" color="text.subtle">
+            Accent
+          </FormLabel>
+          <Controller
+            name="accentKey"
+            control={control}
+            render={({ field }) => (
+              <SimpleGrid columns={{ base: 2, sm: 3 }} spacing={3} w="full">
+                {accentOptions.map((option) => {
+                  const isSelected = field.value === option.key;
+                  const hex = option.swatch;
+                  const contrast =
+                    (() => {
+                      const normalized = hex.replace('#', '');
+                      const r = parseInt(normalized.slice(0, 2), 16);
+                      const g = parseInt(normalized.slice(2, 4), 16);
+                      const b = parseInt(normalized.slice(4, 6), 16);
+                      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                      return luminance > 0.6 ? 'gray.900' : 'white';
+                    })();
+                  return (
+                    <Button
+                      key={option.key}
+                      type="button"
+                      onClick={() => {
+                        field.onChange(option.key);
+                        setAccent(option.key);
+                      }}
+                      bg={option.swatch}
+                      color={contrast}
+                      variant={isSelected ? 'solid' : 'outline'}
+                      borderColor={isSelected ? option.swatch : 'border.muted'}
+                      _hover={{ opacity: 0.9 }}
+                      boxShadow={isSelected ? 'outline' : undefined}
+                      justifyContent="flex-start"
+                      px={3}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
+              </SimpleGrid>
+            )}
+          />
+          <FormHelperText color="text.muted">
+            Pick the highlight color that will be applied to the generated resume.
+          </FormHelperText>
+        </FormControl>
 
         <Stack direction={{ base: 'column', sm: 'row' }} spacing={4} w="full">
           <Button type="submit" colorScheme="brand" flex="1" isLoading={isGenerating}>

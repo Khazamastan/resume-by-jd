@@ -21,6 +21,7 @@ class Theme:
     margin_bottom: float = 60
     page_width: float = 595.0
     page_height: float = 842.0
+    template: str = "standard"
 
 
 @dataclass

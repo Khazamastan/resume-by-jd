@@ -23,8 +23,11 @@ from . import (
     extract_reference_structure,
     render_resume,
 )
-from .io_utils import load_profile
+from .io_utils import load_profile, profile_to_canonical, save_profile
 from .models import ResumeDocument, ResumeProfile, ResumeSection, Theme
+from .profile_generator import build_profile_from_reference
+import yaml
+import re
 
 
 class SectionUpdate(BaseModel):
@@ -40,6 +43,29 @@ class UpdatePayload(BaseModel):
 
 RESUME_SESSIONS: Dict[str, ResumeDocument] = {}
 
+_HEX_COLOR_PATTERN = re.compile(r"^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})$")
+
+
+def _normalize_hex_color(value: str) -> str:
+    candidate = (value or "").strip()
+    if not candidate:
+        raise ValueError("Color value is empty.")
+    if not _HEX_COLOR_PATTERN.fullmatch(candidate):
+        raise ValueError(f"Invalid color value: {value!r}")
+    if not candidate.startswith("#"):
+        candidate = f"#{candidate}"
+    if len(candidate) == 4:
+        candidate = "#" + "".join(ch * 2 for ch in candidate[1:])
+    return candidate.lower()
+
+
+def _apply_theme_overrides(theme: Theme, overrides: Dict[str, str]) -> None:
+    accent_color = overrides.get("accent_color")
+    if accent_color:
+        theme.accent_color = accent_color
+    primary_color = overrides.get("primary_color")
+    if primary_color:
+        theme.primary_color = primary_color
 
 def _encode_pdf(pdf_bytes: bytes) -> str:
     return base64.b64encode(pdf_bytes).decode("utf-8")
@@ -75,7 +101,7 @@ def _section_payload(section: ResumeSection) -> Dict[str, object]:
             date_range = str(entry.get("date_range") or "").strip()
             header_parts = [part for part in [role, f"@ {company}" if company else "", location, date_range] if part]
             if header_parts:
-                derived_paragraphs.append(" • ".join(header_parts))
+                derived_paragraphs.append(" | ".join(header_parts))
             for bullet in entry.get("bullets", []) or []:
                 clean = str(bullet).strip()
                 if clean:
@@ -178,7 +204,7 @@ def _apply_section_update(section: ResumeSection, update: SectionUpdate) -> None
                         entry["location"],
                         entry["date_range"],
                     ]
-                    header = " • ".join([part for part in header_parts if part])
+                    header = " | ".join([part for part in header_parts if part])
                     if header:
                         derived_paragraphs.append(header)
                     derived_bullets.extend(entry["bullets"])
@@ -261,20 +287,25 @@ def _build_app() -> FastAPI:
     @app.post("/api/generate")
     async def generate_resume(
         reference: UploadFile = File(...),
-        profile: UploadFile = File(...),
+        profile: UploadFile | None = File(default=None),
         job_description: UploadFile | None = File(default=None),
         job_text: str | None = Form(default=None),
+        accent_color: str | None = Form(default=None),
+        primary_color: str | None = Form(default=None),
     ) -> Dict[str, object]:
         if job_description is None and not job_text:
             raise HTTPException(status_code=400, detail="Provide job description text or file.")
 
         async with _temporary_workspace() as workspace:
             reference_path = workspace.path(_sanitize_filename(reference.filename, "reference.pdf"))
-            profile_path = workspace.path(_sanitize_filename(profile.filename, "profile.yml"))
+            profile_path: Path | None = None
+            if profile is not None:
+                profile_path = workspace.path(_sanitize_filename(profile.filename, "profile.yml"))
             output_path = workspace.path("resume.pdf")
 
             await _persist_upload(reference, reference_path)
-            await _persist_upload(profile, profile_path)
+            if profile is not None and profile_path is not None:
+                await _persist_upload(profile, profile_path)
 
             if job_description:
                 jd_path = workspace.path(_sanitize_filename(job_description.filename, "job.txt"))
@@ -284,10 +315,38 @@ def _build_app() -> FastAPI:
                 job_contents = job_text or ""
 
             try:
-                profile_data = load_profile(profile_path)
                 reference_structure = extract_reference_structure(reference_path)
+                if profile_path:
+                    profile_data = load_profile(profile_path)
+                else:
+                    profile_data = build_profile_from_reference(reference_structure)
+                    generated_profile_path = workspace.path("generated_profile.yml")
+                    save_profile(profile_data, generated_profile_path)
+                    print("--- Auto-generated profile ---")
+                    canonical_profile = profile_to_canonical(profile_data)
+                    print(yaml.safe_dump(canonical_profile, sort_keys=False, allow_unicode=True))
+                    print(f"Profile saved to: {generated_profile_path}")
                 insights = analyze_job_description(job_contents)
                 document = build_resume_document(reference_structure, profile_data, insights)
+                overrides: Dict[str, str] = {}
+                if accent_color:
+                    try:
+                        overrides["accent_color"] = _normalize_hex_color(accent_color)
+                    except ValueError as exc:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Invalid accent_color. Provide a hex value like #1a2b3c.",
+                        ) from exc
+                if primary_color:
+                    try:
+                        overrides["primary_color"] = _normalize_hex_color(primary_color)
+                    except ValueError as exc:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Invalid primary_color. Provide a hex value like #1a2b3c.",
+                        ) from exc
+                if overrides:
+                    _apply_theme_overrides(document.theme, overrides)
                 render_resume(document, output_path)
             except (ValueError, FileNotFoundError) as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -305,11 +364,18 @@ def _build_app() -> FastAPI:
         document = RESUME_SESSIONS.get(resume_id)
         if document is None:
             raise HTTPException(status_code=404, detail="Resume session not found.")
-        if len(payload.sections) != len(document.sections):
-            raise HTTPException(status_code=400, detail="Section count mismatch.")
+        existing_sections = list(document.sections)
+        updated_sections: List[ResumeSection] = []
 
-        for section, update in zip(document.sections, payload.sections, strict=False):
+        for index, update in enumerate(payload.sections):
+            if index < len(existing_sections):
+                section = existing_sections[index]
+            else:
+                section = ResumeSection(title=update.title.strip() or "Untitled Section")
             _apply_section_update(section, update)
+            updated_sections.append(section)
+
+        document.sections = updated_sections
 
         async with _temporary_workspace() as workspace:
             output_path = workspace.path("resume.pdf")

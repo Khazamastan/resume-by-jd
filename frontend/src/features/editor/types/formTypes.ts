@@ -54,7 +54,7 @@ function serialiseParagraphs(value: string): string[] {
 function serialiseBullets(value: string): string[] {
   return value
     .split(/\n+/)
-    .map((line) => line.replace(/^[-•]\s*/, '').trim())
+    .map((line) => line.replace(/^[-■]\s*/, '').trim())
     .filter(Boolean);
 }
 
@@ -162,7 +162,7 @@ export function mapFormToSections(values: SectionFormValue[]): ResumeSection[] {
         .map((line) => ({
           category: line.category.trim(),
           items: line.items
-            .split(/[, \n]+/)
+            .split(/(?:,\s*|\n+)/)
             .map((item) => item.trim())
             .filter(Boolean),
         }))

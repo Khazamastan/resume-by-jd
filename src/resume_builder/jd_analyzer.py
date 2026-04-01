@@ -48,7 +48,7 @@ STOPWORDS = {
 
 
 def _tokenize_phrases(text: str) -> Iterable[str]:
-    text = re.sub(r"[•·\-\u2013\u2014]", "\n", text)
+    text = re.sub(r"[■·\-\u2013\u2014]", "\n", text)
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:

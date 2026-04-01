@@ -3,9 +3,11 @@ import api from '@/lib/api';
 
 export interface GenerateResumeParams {
   reference: File;
-  profile: File;
+  profile?: File;
   jobDescriptionFile?: File;
   jobText?: string;
+  accentColor?: string;
+  primaryColor?: string;
 }
 
 export async function generateResume({
@@ -13,10 +15,14 @@ export async function generateResume({
   profile,
   jobDescriptionFile,
   jobText,
+  accentColor,
+  primaryColor,
 }: GenerateResumeParams): Promise<ResumeDocumentPayload> {
   const formData = new FormData();
   formData.append('reference', reference);
-  formData.append('profile', profile);
+  if (profile) {
+    formData.append('profile', profile);
+  }
 
   if (jobDescriptionFile) {
     formData.append('job_description', jobDescriptionFile);
@@ -24,6 +30,14 @@ export async function generateResume({
 
   if (jobText) {
     formData.append('job_text', jobText);
+  }
+
+  if (accentColor) {
+    formData.append('accent_color', accentColor);
+  }
+
+  if (primaryColor) {
+    formData.append('primary_color', primaryColor);
   }
 
   const { data } = await api.post<ResumeDocumentPayload>('/api/generate', formData, {
@@ -40,9 +54,8 @@ export async function updateResume(
   return data;
 }
 
-export function buildDownloadName(profileName?: string) {
-  if (profileName === undefined || profileName.trim() === '') {
-    return 'resume.pdf';
-  }
-  return profileName.replace(/\s+/g, '_').toLowerCase() + '_resume.pdf';
+const DEFAULT_DOWNLOAD_NAME = 'Khajamastan-Bellamkonda.pdf';
+
+export function buildDownloadName(_profileName?: string) {
+  return DEFAULT_DOWNLOAD_NAME;
 }

@@ -21,7 +21,7 @@ import { useCallback, useEffect } from 'react';
 import { FiArrowRight, FiRefreshCcw } from 'react-icons/fi';
 
 import { EditResumeModal } from '@/features/editor/components/EditResumeModal';
-import { buildDownloadName,GenerateResumeParams } from '@/features/generator/api';
+import { buildDownloadName, GenerateResumeParams } from '@/features/generator/api';
 import { GeneratorForm } from '@/features/generator/components/GeneratorForm';
 import { ResumePreview } from '@/features/generator/components/ResumePreview';
 import { useResumeSession } from '@/features/generator/useResumeSession';
@@ -178,7 +178,7 @@ function SessionSummary({ profileName, headline, sections, onEdit, onReset, isBu
           <Stack spacing={1}>
             {visibleSections.map((section) => (
               <Text key={section.title} fontSize="sm" color="text.subtle">
-                • {section.title}
+                ■ {section.title}
               </Text>
             ))}
             {sections.length > visibleSections.length && (
@@ -250,7 +250,7 @@ export default function App() {
     reset();
     toast({
       title: 'Session cleared',
-      description: 'Upload a new reference and profile to get started again.',
+      description: 'Upload a new reference (and optionally a profile) to get started again.',
       status: 'info',
       duration: 3000,
     });

@@ -109,7 +109,8 @@ export function ResumePreview({
               <Center h="full" flexDir="column" gap={3} bg="surface.card" px={6}>
                 <Icon as={FiFileText} boxSize={10} color="text.muted" />
                 <Text color="text.muted" textAlign="center" maxW="320px">
-                  Your generated resume will appear here. Upload a reference resume and profile to begin.
+                  Your generated resume will appear here. Upload at least a reference resume to begin (add a profile file
+                  if you have one handy).
                 </Text>
                 <Text color="text.muted" fontSize="sm">
                   Step 1: Use the panel on the left to upload your files.

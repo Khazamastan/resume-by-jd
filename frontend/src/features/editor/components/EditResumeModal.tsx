@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  Divider,
   Flex,
   Grid,
   GridItem,
@@ -97,13 +96,13 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
     }
     try {
       const sections = mapFormToSections(values.sections);
-      await onUpdated({ resumeId: session.resume_id, sections });
+      const updated = await onUpdated({ resumeId: session.resume_id, sections });
+      reset({ sections: mapSectionsToForm(updated.sections) });
       toast({
         title: 'Resume updated',
         description: 'Preview refreshed with your latest edits.',
         status: 'success',
       });
-      onClose();
     } catch (error) {
       toast({
         title: 'Update failed',
@@ -140,7 +139,7 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
                 Edit Resume Sections
               </Heading>
               <Text fontSize="sm" color="text.subtle">
-                Adjust summary, skills, and experience details. Save to refresh the PDF preview.
+                While editing, save updates as is—do not change anything.
               </Text>
             </VStack>
             <Tag variant="subtle" colorScheme="brand" borderRadius="full" px={4} py={1}>
@@ -152,7 +151,7 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
         <ModalBody p={0}>
           <Grid templateColumns={{ base: '1fr', xl: `minmax(0, 1fr) ${PREVIEW_MIN_WIDTH}px` }} h="calc(100vh - 168px)">
             <GridItem overflowY="auto" px={{ base: 6, md: 10 }} py={8}>
-              <Stack spacing={8} as="form" onSubmit={submit}>
+              <Stack spacing={8} as="form" id="resume-editor-form" onSubmit={submit}>
                 <Stack spacing={6}>
                   {fields.map((section, index) => (
                     <SectionEditor
@@ -168,15 +167,6 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
                     Add Section
                   </Button>
                 </Stack>
-                <Divider borderColor="border.muted" />
-                <HStack justify="flex-end" spacing={4}>
-                  <Button variant="ghost" colorScheme="gray" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" colorScheme="brand" isLoading={isUpdating} isDisabled={!isDirty && !isUpdating}>
-                    Save &amp; Refresh
-                  </Button>
-                </HStack>
               </Stack>
             </GridItem>
             <GridItem display={{ base: 'none', xl: 'flex' }} borderLeftWidth="1px" borderColor="border.muted" flexDir="column" bg="surface.card" minW={`${PREVIEW_MIN_WIDTH}px`}>
@@ -202,12 +192,18 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
             </GridItem>
           </Grid>
         </ModalBody>
-        <ModalFooter display={{ base: 'flex', xl: 'none' }} borderTopWidth="1px" borderColor="border.muted" bg="surface.card">
+        <ModalFooter borderTopWidth="1px" borderColor="border.muted" bg="surface.card">
           <HStack w="full" justify="flex-end" spacing={4}>
             <Button variant="ghost" colorScheme="gray" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={submit} colorScheme="brand" isLoading={isUpdating} isDisabled={!isDirty && !isUpdating}>
+            <Button
+              type="submit"
+              form="resume-editor-form"
+              colorScheme="brand"
+              isLoading={isUpdating}
+              isDisabled={!isDirty && !isUpdating}
+            >
               Save &amp; Refresh
             </Button>
           </HStack>

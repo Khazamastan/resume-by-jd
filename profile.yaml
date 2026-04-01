@@ -4,10 +4,9 @@ contact:
   phone: "+91-7207810602"
   email: khazamastan@gmail.com
   location: Bangalore, India
+  linkedin: https://www.linkedin.com/in/khazamastan
 summary:
-  - Principal-level front-end engineer with 10+ years delivering large-scale web applications for global product companies.
-  - Strong focus on React ecosystems, micro front-ends, and resilient CI/CD pipelines that improve performance and developer velocity.
-  - Proven track record aligning user experience with business goals while raising code quality and test coverage.
+  - I am an experienced software developer with a strong background in front-end and UI engineering, specializing in React.js, TypeScript, Node.js, Angular, and modern build systems like Webpack. Over the years, I have led and contributed to major projects at Oracle, Xactly, PWC, Nineleaps, Minewhat, and Thrymr Software, delivering solutions that improved performance, security, and user experience. My work includes revamping notification systems, implementing disaster recovery workflows, building modular and config-driven UI frameworks, and automating CI/CD pipelines. With a degree in Mechanical Engineering from Rajiv Gandhi University of Knowledge Technologies, I have consistently driven efficiency and innovation, such as reducing development effort by up to 60% and increasing test coverage to 70%. I am now seeking new opportunities to leverage my expertise in building scalable, high-quality software products.
 experience:
   - company: Oracle
     role: Principal Member Technical Staff
@@ -34,7 +33,7 @@ experience:
       - Led the React and TypeScript Objectives product, bootstrapping the codebase, end-to-end tests, and CI/CD deployments.
       - Built the Incent module for incentive compensation using React.js, Node.js, Angular, and Webpack.
       - Created a config-driven React framework that accelerates Objectives UI delivery.
-  - company: Tesco (Nineleaps)
+  - company: Nineleaps
     role: Software Development Engineer II
     location: Bangalore, KA
     start: 2020-05-01
@@ -45,7 +44,7 @@ experience:
       - Delivered Vendor Management System modules such as Interview, Onboarding, Performance, and Exit using React.js, Node.js, Webpack, Styled Components, and Cypress.
       - Automated build and deployment pipelines to improve development efficiency and application performance.
       - Added Cypress-driven unit and end-to-end testing to raise reliability.
-  - company: PWC SDC
+  - company: PWC
     role: Senior Software Engineer
     location: Bangalore, KA
     start: 2018-07-01

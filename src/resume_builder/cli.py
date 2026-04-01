@@ -7,6 +7,8 @@ from typing import Any, Dict, List
 from . import io_utils
 from .jd_analyzer import analyze_job_description
 from .pdf_generator import render_resume
+from .profile_generator import build_profile_from_reference
+import yaml
 from .reference_parser import extract_reference_structure
 from .resume_updater import build_resume_document
 
@@ -16,7 +18,7 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Update a resume based on a job description while preserving the original theme."
     )
     parser.add_argument("--reference", required=True, help="Path to the reference resume PDF.")
-    parser.add_argument("--profile", required=True, help="Path to the structured resume profile (YAML or JSON).")
+    parser.add_argument("--profile", help="Path to the structured resume profile (YAML or JSON).")
     parser.add_argument("--job-description", required=True, help="Path to the job description text file.")
     parser.add_argument("--output", required=True, help="Destination PDF path for the updated resume.")
     parser.add_argument("--debug-dir", help="Optional directory to dump intermediate JSON artifacts.")
@@ -57,8 +59,19 @@ def main(argv: List[str] | None = None) -> None:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    profile = io_utils.load_profile(args.profile)
+    output_hint = Path(args.output)
+    generated_profile_path: Path | None = None
+
     reference = extract_reference_structure(args.reference)
+    if args.profile:
+        profile = io_utils.load_profile(args.profile)
+    else:
+        profile = build_profile_from_reference(reference)
+        generated_profile_path = output_hint.with_name(f"{output_hint.stem}_profile.yml")
+        io_utils.save_profile(profile, generated_profile_path)
+        print("--- Auto-generated profile ---")
+        print(yaml.safe_dump(profile.__dict__, sort_keys=False, allow_unicode=True))
+        print(f"Profile saved to: {generated_profile_path}")
     job_description = _read_job_description(args.job_description)
     insights = analyze_job_description(job_description)
 
@@ -69,6 +82,8 @@ def main(argv: List[str] | None = None) -> None:
         _dump_reference_structure(reference, insights, Path(args.debug_dir))
 
     print(f"Updated resume generated at {output_path}")
+    if generated_profile_path:
+        print(f"Generated profile written to {generated_profile_path}")
 
 
 if __name__ == "__main__":
