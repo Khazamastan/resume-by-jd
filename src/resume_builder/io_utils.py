@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List
@@ -9,6 +10,9 @@ import yaml
 
 from .models import ResumeProfile, ResumeSection
 
+_CITE_START_PATTERN = re.compile(r"\[cite_start\]")
+_CITE_PATTERN = re.compile(r"\s*\[cite:\s*[0-9,\s]+\]")
+
 
 def _ensure_path(path: Path) -> Path:
     if not path.exists():
@@ -16,12 +20,25 @@ def _ensure_path(path: Path) -> Path:
     return path
 
 
+def _strip_citation_artifacts(raw_text: str) -> str:
+    without_starts = _CITE_START_PATTERN.sub("", raw_text)
+    return _CITE_PATTERN.sub("", without_starts)
+
+
 def load_profile(profile_path: str | Path) -> ResumeProfile:
     """Load structured resume profile data from YAML or JSON."""
     path = _ensure_path(Path(profile_path))
     data: Dict[str, Any]
     if path.suffix.lower() in {".yaml", ".yml"}:
-        data = yaml.safe_load(path.read_text()) or {}
+        text = path.read_text()
+        try:
+            data = yaml.safe_load(text) or {}
+        except yaml.YAMLError:
+            cleaned_text = _strip_citation_artifacts(text)
+            try:
+                data = yaml.safe_load(cleaned_text) or {}
+            except yaml.YAMLError as cleaned_error:
+                raise ValueError(f"Invalid YAML profile file: {path}") from cleaned_error
     elif path.suffix.lower() == ".json":
         data = json.loads(path.read_text())
     else:

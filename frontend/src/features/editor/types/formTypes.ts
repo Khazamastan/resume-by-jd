@@ -1,4 +1,4 @@
-import type { CategoryLine, ExperienceEntry, ResumeSection } from '@/features/shared/types';
+import type { CategoryLine, ExperienceEntry, ResumeProfile, ResumeSection } from '@/features/shared/types';
 
 export enum SectionKind {
   Summary = 'summary',
@@ -30,7 +30,19 @@ export interface SectionFormValue {
   rawMeta?: Record<string, unknown>;
 }
 
+export interface HeaderFormValue {
+  name: string;
+  headline: string;
+  company: string;
+  phone: string;
+  email: string;
+  location: string;
+  linkedin: string;
+  noticeNote: string;
+}
+
 export interface ResumeEditorFormValues {
+  header: HeaderFormValue;
   sections: SectionFormValue[];
 }
 
@@ -48,7 +60,7 @@ function serialiseParagraphs(value: string): string[] {
   return value
     .split(/\n{2,}/)
     .map((line) => line.trim())
-  .filter(Boolean);
+    .filter(Boolean);
 }
 
 function serialiseBullets(value: string): string[] {
@@ -64,6 +76,9 @@ function determineKind(section: ResumeSection): SectionKind {
     return SectionKind.TechnicalSkills;
   }
   if (EXPERIENCE_TITLES.includes(title)) {
+    return SectionKind.Experience;
+  }
+  if (title.includes('experience')) {
     return SectionKind.Experience;
   }
   if (title.includes('summary')) {
@@ -96,6 +111,93 @@ function normaliseExperiences(meta?: ResumeSection['meta']): ExperienceEntry[] {
     return [];
   }
   return entries as ExperienceEntry[];
+}
+
+function firstExperienceCompany(sections?: ResumeSection[] | null): string {
+  if (!sections || sections.length === 0) {
+    return '';
+  }
+
+  for (const section of sections) {
+    const title = (section.title || '').toLowerCase();
+    if (!title.includes('experience')) {
+      continue;
+    }
+
+    const entries = section.meta?.entries;
+    if (Array.isArray(entries)) {
+      for (const entry of entries) {
+        const company = typeof entry?.company === 'string' ? entry.company.trim() : '';
+        if (company) {
+          return company;
+        }
+      }
+    }
+
+    for (const line of section.paragraphs ?? []) {
+      const text = line.trim();
+      const atMatch = text.match(/@\s*([^|]+)/);
+      if (atMatch && atMatch[1]) {
+        return atMatch[1].trim();
+      }
+    }
+  }
+
+  return '';
+}
+
+function splitHeadline(value?: string): { role: string; company: string } {
+  const clean = (value ?? '').trim();
+  if (!clean) {
+    return { role: '', company: '' };
+  }
+  const lower = clean.toLowerCase();
+  const marker = ' at ';
+  const markerIndex = lower.lastIndexOf(marker);
+  if (markerIndex <= 0) {
+    return { role: clean, company: '' };
+  }
+  return {
+    role: clean.slice(0, markerIndex).trim(),
+    company: clean.slice(markerIndex + marker.length).trim(),
+  };
+}
+
+export function mapProfileToHeader(profile?: ResumeProfile | null, sections?: ResumeSection[] | null): HeaderFormValue {
+  const contact = profile?.contact ?? {};
+  const parsedHeadline = splitHeadline(profile?.headline ?? '');
+  const fallbackCompany = firstExperienceCompany(sections);
+  return {
+    name: profile?.name ?? '',
+    headline: parsedHeadline.role,
+    company: parsedHeadline.company || fallbackCompany,
+    phone: contact.phone ?? '',
+    email: contact.email ?? '',
+    location: contact.location ?? '',
+    linkedin: contact.linkedin ?? '',
+    noticeNote: contact.notice_note ?? '',
+  };
+}
+
+export function mapHeaderToProfile(header: HeaderFormValue): ResumeProfile {
+  const contact: Record<string, string> = {
+    phone: header.phone.trim(),
+    email: header.email.trim(),
+    location: header.location.trim(),
+    linkedin: header.linkedin.trim(),
+    notice_note: header.noticeNote.trim(),
+  };
+
+  const parsedRole = splitHeadline(header.headline.trim());
+  const role = parsedRole.role || header.headline.trim();
+  const company = header.company.trim() || parsedRole.company;
+  const mergedHeadline = company ? (role ? `${role} at ${company}` : `at ${company}`) : role;
+
+  return {
+    name: header.name.trim(),
+    headline: mergedHeadline,
+    contact,
+  };
 }
 
 export function mapSectionsToForm(sections: ResumeSection[]): SectionFormValue[] {

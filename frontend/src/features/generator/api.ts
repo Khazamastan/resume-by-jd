@@ -1,11 +1,24 @@
-import type { ResumeDocumentPayload } from '@/features/shared/types';
+import type { ResumeDocumentPayload, ResumeProfile } from '@/features/shared/types';
 import api from '@/lib/api';
 
+export interface SampleProfileSummary {
+  id: string;
+  label: string;
+}
+
+interface SampleProfilesResponse {
+  default_profile: string;
+  profiles: SampleProfileSummary[];
+}
+
+export const defaultSampleProfileId = 'Khaja';
+
 export interface GenerateResumeParams {
-  reference: File;
+  reference?: File;
   profile?: File;
   jobDescriptionFile?: File;
   jobText?: string;
+  sampleProfile?: string;
   accentColor?: string;
   primaryColor?: string;
 }
@@ -15,11 +28,14 @@ export async function generateResume({
   profile,
   jobDescriptionFile,
   jobText,
+  sampleProfile,
   accentColor,
   primaryColor,
-}: GenerateResumeParams): Promise<ResumeDocumentPayload> {
+}: GenerateResumeParams = {}): Promise<ResumeDocumentPayload> {
   const formData = new FormData();
-  formData.append('reference', reference);
+  if (reference) {
+    formData.append('reference', reference);
+  }
   if (profile) {
     formData.append('profile', profile);
   }
@@ -32,6 +48,10 @@ export async function generateResume({
     formData.append('job_text', jobText);
   }
 
+  if (sampleProfile) {
+    formData.append('sample_profile', sampleProfile);
+  }
+
   if (accentColor) {
     formData.append('accent_color', accentColor);
   }
@@ -40,15 +60,18 @@ export async function generateResume({
     formData.append('primary_color', primaryColor);
   }
 
-  const { data } = await api.post<ResumeDocumentPayload>('/api/generate', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const { data } = await api.post<ResumeDocumentPayload>('/api/generate', formData);
+  return data;
+}
+
+export async function fetchSampleProfiles(): Promise<SampleProfilesResponse> {
+  const { data } = await api.get<SampleProfilesResponse>('/api/sample-profiles');
   return data;
 }
 
 export async function updateResume(
   resumeId: string,
-  payload: { sections: unknown[] },
+  payload: { sections: unknown[]; profile?: ResumeProfile; theme?: Record<string, unknown> },
 ): Promise<ResumeDocumentPayload> {
   const { data } = await api.put<ResumeDocumentPayload>('/api/resume/' + resumeId, payload);
   return data;

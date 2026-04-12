@@ -13,6 +13,7 @@ import {
   FormLabel,
   Heading,
   Input,
+  Select,
   SimpleGrid,
   Stack,
   Text,
@@ -20,65 +21,113 @@ import {
   useBoolean,
   VStack,
 } from '@chakra-ui/react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 
-import type { GenerateResumeParams } from '@/features/generator/api';
+import {
+  defaultSampleProfileId,
+  fetchSampleProfiles,
+  type GenerateResumeParams,
+  type SampleProfileSummary,
+} from '@/features/generator/api';
 import { accentOptions, defaultAccent, getAccentHex, type AccentKey } from '@/theme';
 import { useThemeSettings } from '@/theme/ThemeSettingsProvider';
 
 interface GeneratorFormProps {
   onGenerate: (params: GenerateResumeParams) => Promise<void>;
   isGenerating: boolean;
+  formId?: string;
 }
 
 interface GeneratorFormValues {
-  reference: FileList;
+  sampleProfile: string;
+  reference?: FileList;
   profile?: FileList;
   jobDescriptionFile?: FileList;
   jobText?: string;
   accentKey: AccentKey;
 }
 
-function fileFromList(list?: FileList | null): File | null {
+function fileFromList(list?: FileList | null): File | undefined {
   if (!list || list.length === 0) {
-    return null;
+    return undefined;
   }
-  return list.item(0);
+  return list[0] ?? undefined;
 }
 
-export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) {
+export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-form' }: GeneratorFormProps) {
   const { accent: currentAccent, setAccent } = useThemeSettings();
+  const [sampleProfiles, setSampleProfiles] = useState<SampleProfileSummary[]>([]);
+  const [sampleProfilesError, setSampleProfilesError] = useState<string | null>(null);
+  const [isSampleProfilesLoading, setIsSampleProfilesLoading] = useState(true);
+
   const {
     control,
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitSuccessful },
   } = useForm<GeneratorFormValues>({
     defaultValues: {
+      sampleProfile: defaultSampleProfileId,
       jobText: '',
       accentKey: currentAccent ?? defaultAccent,
     },
   });
   const [hasSubmitted, setHasSubmitted] = useBoolean();
 
+  useEffect(() => {
+    let isMounted = true;
+    setIsSampleProfilesLoading(true);
+
+    fetchSampleProfiles()
+      .then((response) => {
+        if (!isMounted) {
+          return;
+        }
+        const nextProfiles = response.profiles ?? [];
+        setSampleProfiles(nextProfiles);
+        setSampleProfilesError(null);
+
+        const chosenDefault =
+          nextProfiles.find((option) => option.id.toLowerCase() === response.default_profile.toLowerCase())?.id ??
+          nextProfiles.find((option) => option.id.toLowerCase() === defaultSampleProfileId.toLowerCase())?.id ??
+          nextProfiles[0]?.id ??
+          defaultSampleProfileId;
+
+        setValue('sampleProfile', chosenDefault, { shouldDirty: false });
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+        setSampleProfilesError(error instanceof Error ? error.message : 'Unable to load sample profiles.');
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsSampleProfilesLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [setValue]);
+
   const submit = handleSubmit(async (values) => {
     const reference = fileFromList(values.reference);
     const profile = fileFromList(values.profile);
-
-    if (!reference) {
-      return;
-    }
 
     const selectedAccent = values.accentKey ?? defaultAccent;
     const accentColor = getAccentHex(selectedAccent);
 
     await onGenerate({
-      reference,
+      reference: reference ?? undefined,
       profile: profile ?? undefined,
       jobDescriptionFile: fileFromList(values.jobDescriptionFile ?? null) ?? undefined,
       jobText: values.jobText?.trim() ? values.jobText.trim() : undefined,
+      sampleProfile: values.sampleProfile?.trim() || defaultSampleProfileId,
       accentColor,
     });
     setHasSubmitted.on();
@@ -89,54 +138,84 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
     setHasSubmitted.off();
   }, [reset, setHasSubmitted]);
 
+  const selectableSampleProfiles =
+    sampleProfiles.length > 0
+      ? sampleProfiles
+      : [{ id: defaultSampleProfileId, label: defaultSampleProfileId }];
+
   return (
     <Box
       as="form"
+      id={formId}
       onSubmit={submit}
+      w="full"
+      maxW={{ base: '100%', xl: '400px' }}
+      alignSelf="center"
       borderWidth="1px"
       borderColor="border.muted"
-      borderRadius="2xl"
+      borderRadius="xl"
       bg="surface.card"
-      p={{ base: 5, md: 6 }}
+      p={{ base: 4, md: 5 }}
       boxShadow="sm"
     >
-      <VStack align="flex-start" spacing={6}>
-        <VStack align="flex-start" spacing={2}>
-          <Badge colorScheme="purple" borderRadius="full" px={3} py={1}>
-            Step 1 · Required
+      <VStack align="flex-start" spacing={4}>
+        <VStack align="flex-start" spacing={1}>
+          <Badge colorScheme="brand" borderRadius="full" px={3} py={1}>
+            Step 1 · Optional
           </Badge>
-          <Heading fontSize="lg" fontWeight="semibold">
-            Upload your baseline files
+          <Heading fontSize="md" fontWeight="semibold">
+            Upload baseline files (optional)
           </Heading>
-          <Text fontSize="sm" color="text.subtle">
-            We copy structure from your reference resume and, if provided, merge in your saved profile before tailoring it
-            to the job description.
+          <Text fontSize="xs" color="text.subtle">
+            If omitted, we auto-use `resume.pdf` and `profile.yaml` from your selected sample profile.
           </Text>
         </VStack>
 
-        <Stack spacing={5} w="full">
+        <Stack spacing={4} w="full">
+          <FormControl>
+            <FormLabel color="text.subtle">
+              Sample Profile
+            </FormLabel>
+            <Select
+              {...register('sampleProfile')}
+              bg="surface.card"
+              borderColor="border.muted"
+              _hover={{ borderColor: 'brand.300' }}
+              isDisabled={isGenerating || isSampleProfilesLoading}
+            >
+              {selectableSampleProfiles.map((sampleProfileOption) => (
+                <option key={sampleProfileOption.id} value={sampleProfileOption.id}>
+                  {sampleProfileOption.label}
+                </option>
+              ))}
+            </Select>
+            <FormHelperText color="text.muted">
+              {sampleProfilesError
+                ? `Using default sample (${defaultSampleProfileId}) because profiles could not be loaded.`
+                : 'If files are not uploaded, we use this sample folder from `/samples`.'}
+            </FormHelperText>
+          </FormControl>
+
           <FormControl isInvalid={Boolean(errors.reference)}>
-            <FormLabel fontSize="sm" color="text.subtle">
+            <FormLabel color="text.subtle">
               Reference Resume (PDF)
             </FormLabel>
             <Input
               type="file"
               accept="application/pdf"
-              {...register('reference', {
-                validate: (value) => (value && value.length > 0) || 'Reference resume is required.',
-              })}
+              {...register('reference')}
               bg="surface.card"
               borderColor="border.muted"
               _hover={{ borderColor: 'brand.300' }}
             />
             <FormErrorMessage>{errors.reference?.message}</FormErrorMessage>
             <FormHelperText color="text.muted">
-              We use your existing resume as structure and styling guidance.
+              Optional. If not uploaded, defaults to `samples/sample-profile/resume.pdf`.
             </FormHelperText>
           </FormControl>
 
           <FormControl>
-            <FormLabel fontSize="sm" color="text.subtle">
+            <FormLabel color="text.subtle">
               Profile (JSON or YAML)
             </FormLabel>
             <Input
@@ -148,23 +227,23 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
               _hover={{ borderColor: 'brand.300' }}
             />
             <FormHelperText color="text.muted">
-              Optional. Upload a saved profile file to override the inferred details we derive from your reference resume.
+              Optional. If not uploaded, defaults to `samples/sample-profile/profile.yaml`.
             </FormHelperText>
           </FormControl>
 
           <Divider borderColor="border.muted" />
 
           <VStack align="flex-start" spacing={2}>
-            <Badge colorScheme="purple" borderRadius="full" px={3} py={1} variant="outline">
-              Optional · Boost alignment
+            <Badge colorScheme="brand" borderRadius="full" px={3} py={1} variant="outline">
+              Optional · Job context
             </Badge>
-            <Text fontSize="sm" color="text.subtle">
-              Provide the job description so we can highlight relevant keywords and impact metrics.
+            <Text fontSize="xs" color="text.subtle">
+              If omitted, job description defaults to `N/A`.
             </Text>
           </VStack>
 
           <FormControl>
-            <FormLabel fontSize="sm" color="text.subtle">
+            <FormLabel color="text.subtle">
               Job Description (PDF or TXT)
             </FormLabel>
             <Controller
@@ -188,11 +267,11 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
           </FormControl>
 
           <FormControl>
-            <FormLabel fontSize="sm" color="text.subtle">
+            <FormLabel color="text.subtle">
               Job Description Text
             </FormLabel>
             <Textarea
-              minH="120px"
+              minH="96px"
               placeholder="Paste highlights or responsibilities from the job posting…"
               {...register('jobText')}
               bg="surface.card"
@@ -206,14 +285,14 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
         </Stack>
 
         <FormControl>
-          <FormLabel fontSize="sm" color="text.subtle">
+          <FormLabel color="text.subtle">
             Accent
           </FormLabel>
           <Controller
             name="accentKey"
             control={control}
             render={({ field }) => (
-              <SimpleGrid columns={{ base: 2, sm: 3 }} spacing={3} w="full">
+              <SimpleGrid columns={{ base: 2, sm: 3 }} spacing={2} w="full">
                 {accentOptions.map((option) => {
                   const isSelected = field.value === option.key;
                   const hex = option.swatch;
@@ -241,7 +320,7 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
                       _hover={{ opacity: 0.9 }}
                       boxShadow={isSelected ? 'outline' : undefined}
                       justifyContent="flex-start"
-                      px={3}
+                      px={2}
                     >
                       {option.label}
                     </Button>
@@ -255,20 +334,15 @@ export function GeneratorForm({ onGenerate, isGenerating }: GeneratorFormProps) 
           </FormHelperText>
         </FormControl>
 
-        <Stack direction={{ base: 'column', sm: 'row' }} spacing={4} w="full">
-          <Button type="submit" colorScheme="brand" flex="1" isLoading={isGenerating}>
-            Generate Resume
-          </Button>
-          <Button onClick={handleReset} variant="ghost" colorScheme="gray" flex={{ base: '1', sm: 'initial' }}>
-            Clear
-          </Button>
-        </Stack>
+        <Button size="sm" onClick={handleReset} variant="ghost" colorScheme="gray" alignSelf="flex-start" isDisabled={isGenerating}>
+          Clear
+        </Button>
 
         {hasSubmitted && isSubmitSuccessful && (
-          <Alert status="success" variant="left-accent" bg="surface.subtle" borderRadius="lg" borderLeftWidth="6px" borderColor="green.400">
-            <AlertIcon color="green.500" />
+          <Alert status="success" variant="left-accent" bg="surface.subtle" borderRadius="lg" borderLeftWidth="6px" borderColor="brand.400">
+            <AlertIcon color="brand.500" />
             <Box>
-              <AlertTitle color="green.700">Uploaded!</AlertTitle>
+              <AlertTitle color="brand.700">Uploaded!</AlertTitle>
               <AlertDescription color="text.subtle">
                 We&apos;ll craft your resume and refresh the preview automatically.
               </AlertDescription>

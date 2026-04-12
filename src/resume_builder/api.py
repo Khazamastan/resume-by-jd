@@ -37,13 +37,78 @@ class SectionUpdate(BaseModel):
     meta: Optional[Dict[str, object]] = None
 
 
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    headline: Optional[str] = None
+    contact: Optional[Dict[str, str]] = None
+
+
 class UpdatePayload(BaseModel):
     sections: List[SectionUpdate]
+    profile: Optional[ProfileUpdate] = None
+    theme: Optional[Dict[str, object]] = None
 
 
 RESUME_SESSIONS: Dict[str, ResumeDocument] = {}
 
 _HEX_COLOR_PATTERN = re.compile(r"^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})$")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_REFERENCE_PATH = PROJECT_ROOT / "resume.pdf"
+DEFAULT_PROFILE_PATH = PROJECT_ROOT / "profile.yaml"
+SAMPLES_ROOT = PROJECT_ROOT / "samples"
+DEFAULT_SAMPLE_PROFILE = "Khaja"
+PROFILE_FILE_CANDIDATES = ("profile.yaml", "profile.yml", "profile.json")
+
+
+def _find_profile_file(profile_dir: Path) -> Optional[Path]:
+    for filename in PROFILE_FILE_CANDIDATES:
+        candidate = profile_dir / filename
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _discover_sample_profiles() -> List[Dict[str, str]]:
+    if not SAMPLES_ROOT.exists():
+        return []
+
+    profiles: List[Dict[str, str]] = []
+    for entry in sorted(SAMPLES_ROOT.iterdir(), key=lambda item: item.name.lower()):
+        if not entry.is_dir():
+            continue
+        reference_path = entry / "resume.pdf"
+        profile_path = _find_profile_file(entry)
+        if not reference_path.exists() or profile_path is None:
+            continue
+        profiles.append(
+            {
+                "id": entry.name,
+                "label": entry.name,
+                "reference_path": str(reference_path),
+                "profile_path": str(profile_path),
+            }
+        )
+    return profiles
+
+
+def _resolve_sample_profile_paths(sample_profile: Optional[str]) -> tuple[Path | None, Path | None]:
+    discovered_profiles = _discover_sample_profiles()
+    if not discovered_profiles:
+        return None, None
+
+    requested_profile = (sample_profile or DEFAULT_SAMPLE_PROFILE).strip()
+    if not requested_profile:
+        requested_profile = DEFAULT_SAMPLE_PROFILE
+
+    for profile in discovered_profiles:
+        if profile["id"].lower() == requested_profile.lower():
+            return Path(profile["reference_path"]), Path(profile["profile_path"])
+
+    available_profiles = ", ".join(profile["id"] for profile in discovered_profiles)
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unknown sample_profile '{requested_profile}'. Available options: {available_profiles}.",
+    )
 
 
 def _normalize_hex_color(value: str) -> str:
@@ -66,6 +131,41 @@ def _apply_theme_overrides(theme: Theme, overrides: Dict[str, str]) -> None:
     primary_color = overrides.get("primary_color")
     if primary_color:
         theme.primary_color = primary_color
+
+
+def _theme_from_payload(payload: Optional[Dict[str, object]]) -> Theme:
+    theme = Theme()
+    if not isinstance(payload, dict):
+        return theme
+
+    text_fields = ("body_font", "heading_font", "primary_color", "accent_color", "template")
+    for field_name in text_fields:
+        value = payload.get(field_name)
+        if isinstance(value, str) and value.strip():
+            setattr(theme, field_name, value.strip())
+
+    numeric_fields = (
+        "body_size",
+        "heading_size",
+        "line_height",
+        "margin_left",
+        "margin_right",
+        "margin_top",
+        "margin_bottom",
+        "page_width",
+        "page_height",
+    )
+    for field_name in numeric_fields:
+        value = payload.get(field_name)
+        if value is None:
+            continue
+        try:
+            setattr(theme, field_name, float(value))
+        except (TypeError, ValueError):
+            continue
+
+    return theme
+
 
 def _encode_pdf(pdf_bytes: bytes) -> str:
     return base64.b64encode(pdf_bytes).decode("utf-8")
@@ -214,6 +314,29 @@ def _apply_section_update(section: ResumeSection, update: SectionUpdate) -> None
                 section.meta.pop("entries")
 
 
+def _apply_profile_update(profile: ResumeProfile, update: Optional[ProfileUpdate]) -> None:
+    if update is None:
+        return
+
+    if update.name is not None:
+        cleaned_name = update.name.strip()
+        if cleaned_name:
+            profile.name = cleaned_name
+
+    if update.headline is not None:
+        profile.headline = update.headline.strip()
+
+    if update.contact is not None:
+        existing_contact = dict(profile.contact or {})
+        normalized_contact: Dict[str, str] = {}
+        for key in ("phone", "email", "location", "linkedin", "notice_note"):
+            raw_value = update.contact.get(key, existing_contact.get(key, ""))
+            clean_value = str(raw_value or "").strip()
+            if clean_value:
+                normalized_contact[key] = clean_value
+        profile.contact = normalized_contact
+
+
 def _maybe_mount_frontend(app: FastAPI) -> None:
     frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
     index_file = frontend_dir / "index.html"
@@ -284,35 +407,65 @@ def _build_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.get("/api/sample-profiles")
+    async def list_sample_profiles() -> Dict[str, object]:
+        profiles = _discover_sample_profiles()
+        return {
+            "default_profile": DEFAULT_SAMPLE_PROFILE,
+            "profiles": [{"id": profile["id"], "label": profile["label"]} for profile in profiles],
+        }
+
     @app.post("/api/generate")
     async def generate_resume(
-        reference: UploadFile = File(...),
+        reference: UploadFile | None = File(default=None),
         profile: UploadFile | None = File(default=None),
         job_description: UploadFile | None = File(default=None),
         job_text: str | None = Form(default=None),
+        sample_profile: str | None = Form(default=None),
         accent_color: str | None = Form(default=None),
         primary_color: str | None = Form(default=None),
     ) -> Dict[str, object]:
-        if job_description is None and not job_text:
-            raise HTTPException(status_code=400, detail="Provide job description text or file.")
-
         async with _temporary_workspace() as workspace:
-            reference_path = workspace.path(_sanitize_filename(reference.filename, "reference.pdf"))
+            sample_reference_path: Path | None = None
+            sample_profile_path: Path | None = None
+            if reference is None or profile is None:
+                sample_reference_path, sample_profile_path = _resolve_sample_profile_paths(sample_profile)
+
+            if reference is not None:
+                reference_path = workspace.path(_sanitize_filename(reference.filename, "reference.pdf"))
+                await _persist_upload(reference, reference_path)
+            elif sample_reference_path is not None:
+                reference_path = workspace.path("reference.pdf")
+                reference_path.write_bytes(sample_reference_path.read_bytes())
+            else:
+                if not DEFAULT_REFERENCE_PATH.exists():
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Default reference resume not found at {DEFAULT_REFERENCE_PATH}. Upload a reference PDF.",
+                    )
+                reference_path = workspace.path("reference.pdf")
+                reference_path.write_bytes(DEFAULT_REFERENCE_PATH.read_bytes())
+
             profile_path: Path | None = None
             if profile is not None:
                 profile_path = workspace.path(_sanitize_filename(profile.filename, "profile.yml"))
-            output_path = workspace.path("resume.pdf")
-
-            await _persist_upload(reference, reference_path)
-            if profile is not None and profile_path is not None:
                 await _persist_upload(profile, profile_path)
+            elif sample_profile_path is not None:
+                profile_path = workspace.path("profile.yaml")
+                profile_path.write_bytes(sample_profile_path.read_bytes())
+            elif DEFAULT_PROFILE_PATH.exists():
+                profile_path = workspace.path("profile.yaml")
+                profile_path.write_bytes(DEFAULT_PROFILE_PATH.read_bytes())
+            output_path = workspace.path("resume.pdf")
 
             if job_description:
                 jd_path = workspace.path(_sanitize_filename(job_description.filename, "job.txt"))
                 await _persist_upload(job_description, jd_path)
                 job_contents = jd_path.read_text()
+            elif job_text and job_text.strip():
+                job_contents = job_text.strip()
             else:
-                job_contents = job_text or ""
+                job_contents = "N/A"
 
             try:
                 reference_structure = extract_reference_structure(reference_path)
@@ -363,7 +516,20 @@ def _build_app() -> FastAPI:
     async def update_resume(resume_id: str, payload: UpdatePayload) -> Dict[str, object]:
         document = RESUME_SESSIONS.get(resume_id)
         if document is None:
-            raise HTTPException(status_code=404, detail="Resume session not found.")
+            # Serverless/cold starts can evict in-memory sessions. Rebuild from client payload.
+            base_name = "Candidate"
+            if payload.profile and payload.profile.name:
+                candidate_name = payload.profile.name.strip()
+                if candidate_name:
+                    base_name = candidate_name
+            document = ResumeDocument(
+                profile=ResumeProfile(name=base_name),
+                sections=[],
+                theme=_theme_from_payload(payload.theme),
+            )
+
+        _apply_profile_update(document.profile, payload.profile)
+
         existing_sections = list(document.sections)
         updated_sections: List[ResumeSection] = []
 

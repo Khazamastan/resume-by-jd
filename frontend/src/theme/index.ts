@@ -383,10 +383,11 @@ const baseThemeConfig = {
     Button: {
       baseStyle: {
         fontWeight: '600',
-        borderRadius: 'lg',
+        borderRadius: 'md',
       },
       defaultProps: {
         colorScheme: 'brand',
+        size: 'sm',
       },
     },
     Badge: {
@@ -395,16 +396,30 @@ const baseThemeConfig = {
         borderRadius: 'full',
         fontWeight: '600',
         letterSpacing: 'wide',
+        px: 2.5,
+        py: 0.5,
+      },
+    },
+    FormLabel: {
+      baseStyle: {
+        fontSize: 'xs',
+        mb: 1,
       },
     },
     Input: {
       defaultProps: {
         focusBorderColor: 'brand.400',
+        size: 'sm',
       },
       sizes: {
+        sm: {
+          field: {
+            borderRadius: 'md',
+          },
+        },
         md: {
           field: {
-            borderRadius: 'lg',
+            borderRadius: 'md',
           },
         },
       },
@@ -412,10 +427,14 @@ const baseThemeConfig = {
     Textarea: {
       defaultProps: {
         focusBorderColor: 'brand.400',
+        size: 'sm',
       },
       sizes: {
+        sm: {
+          borderRadius: 'md',
+        },
         md: {
-          borderRadius: 'lg',
+          borderRadius: 'md',
         },
       },
     },
@@ -429,14 +448,26 @@ const baseThemeConfig = {
     Modal: {
       baseStyle: {
         dialog: {
-          borderRadius: '2xl',
+          borderRadius: 'xl',
+        },
+        header: {
+          px: 5,
+          py: 3,
+        },
+        body: {
+          px: 5,
+          py: 4,
+        },
+        footer: {
+          px: 5,
+          py: 3,
         },
       },
     },
     Alert: {
       baseStyle: {
         container: {
-          borderRadius: 'xl',
+          borderRadius: 'lg',
           alignItems: 'flex-start',
         },
       },
@@ -448,6 +479,7 @@ const baseThemeConfig = {
         bg: 'surface.canvas',
         color: 'text.primary',
         minHeight: '100vh',
+        lineHeight: 'short',
       },
       'html, body, #root': {
         height: '100%',

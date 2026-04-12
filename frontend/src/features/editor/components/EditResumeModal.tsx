@@ -2,6 +2,8 @@ import {
   Box,
   Button,
   Flex,
+  FormControl,
+  FormLabel,
   Grid,
   GridItem,
   Heading,
@@ -17,11 +19,7 @@ import {
   ModalHeader,
   ModalOverlay,
   Stack,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
+  SimpleGrid,
   Tag,
   Text,
   Textarea,
@@ -40,8 +38,15 @@ import {
 } from 'react-hook-form';
 import { FiPlus, FiTrash2 } from 'react-icons/fi';
 
-import { mapFormToSections, mapSectionsToForm, ResumeEditorFormValues, SectionKind } from '@/features/editor/types/formTypes';
-import type { ResumeDocumentPayload, ResumeSection } from '@/features/shared/types';
+import {
+  mapFormToSections,
+  mapHeaderToProfile,
+  mapProfileToHeader,
+  mapSectionsToForm,
+  ResumeEditorFormValues,
+  SectionKind,
+} from '@/features/editor/types/formTypes';
+import type { ResumeDocumentPayload, ResumeProfile, ResumeSection } from '@/features/shared/types';
 import { usePdfUrl } from '@/features/shared/usePdfUrl';
 
 const PREVIEW_MIN_WIDTH = 840;
@@ -50,7 +55,12 @@ interface EditResumeModalProps {
   isOpen: boolean;
   onClose: () => void;
   session: ResumeDocumentPayload | null;
-  onUpdated: (args: { resumeId: string; sections: ResumeSection[] }) => Promise<ResumeDocumentPayload>;
+  onUpdated: (args: {
+    resumeId: string;
+    sections: ResumeSection[];
+    profile: ResumeProfile;
+    theme?: Record<string, unknown>;
+  }) => Promise<ResumeDocumentPayload>;
   isUpdating: boolean;
 }
 
@@ -66,6 +76,7 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
     formState: { isDirty },
   } = useForm<ResumeEditorFormValues>({
     defaultValues: {
+      header: mapProfileToHeader(session?.profile, session?.sections),
       sections: session ? mapSectionsToForm(session.sections) : [],
     },
   });
@@ -77,10 +88,16 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
 
   useEffect(() => {
     if (!session) {
-      reset({ sections: [] });
+      reset({
+        header: mapProfileToHeader(null, null),
+        sections: [],
+      });
       return;
     }
-    reset({ sections: mapSectionsToForm(session.sections) });
+    reset({
+      header: mapProfileToHeader(session.profile, session.sections),
+      sections: mapSectionsToForm(session.sections),
+    });
   }, [session, reset]);
 
   const pdfUrl = usePdfUrl(session?.pdf ?? null);
@@ -96,8 +113,17 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
     }
     try {
       const sections = mapFormToSections(values.sections);
-      const updated = await onUpdated({ resumeId: session.resume_id, sections });
-      reset({ sections: mapSectionsToForm(updated.sections) });
+      const profile = mapHeaderToProfile(values.header);
+      const updated = await onUpdated({
+        resumeId: session.resume_id,
+        sections,
+        profile,
+        theme: session.theme,
+      });
+      reset({
+        header: mapProfileToHeader(updated.profile, updated.sections),
+        sections: mapSectionsToForm(updated.sections),
+      });
       toast({
         title: 'Resume updated',
         description: 'Preview refreshed with your latest edits.',
@@ -135,24 +161,133 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
         <ModalHeader borderBottomWidth="1px" borderColor="border.muted" bg="surface.card">
           <HStack justify="space-between" align="center">
             <VStack align="flex-start" spacing={1}>
-              <Heading fontSize="2xl" fontWeight="extrabold">
-                Edit Resume Sections
+              <Heading fontSize="xl" fontWeight="bold">
+                Edit Resume
               </Heading>
-              <Text fontSize="sm" color="text.subtle">
-                While editing, save updates as is—do not change anything.
+              <Text fontSize="xs" color="text.subtle">
+                Update header details and sections, then use Save & Refresh.
               </Text>
             </VStack>
-            <Tag variant="subtle" colorScheme="brand" borderRadius="full" px={4} py={1}>
+            <Tag size="sm" variant="subtle" colorScheme="brand" borderRadius="full" px={3} py={0.5}>
               Live session
             </Tag>
           </HStack>
         </ModalHeader>
-        <ModalCloseButton top={4} right={4} />
+        <ModalCloseButton top={3} right={3} />
         <ModalBody p={0}>
           <Grid templateColumns={{ base: '1fr', xl: `minmax(0, 1fr) ${PREVIEW_MIN_WIDTH}px` }} h="calc(100vh - 168px)">
-            <GridItem overflowY="auto" px={{ base: 6, md: 10 }} py={8}>
-              <Stack spacing={8} as="form" id="resume-editor-form" onSubmit={submit}>
-                <Stack spacing={6}>
+            <GridItem overflowY="auto" px={{ base: 4, md: 6 }} py={5} display="flex" justifyContent="center">
+              <Stack spacing={6} as="form" id="resume-editor-form" onSubmit={submit} w="full" maxW="980px">
+                <Box borderWidth="1px" borderColor="border.muted" borderRadius="xl" p={{ base: 4, md: 5 }} bg="surface.card" boxShadow="sm">
+                  <VStack align="flex-start" spacing={1} mb={4}>
+                    <Heading fontSize="lg" color="text.primary">
+                      Header Details
+                    </Heading>
+                    <Text fontSize="xs" textTransform="uppercase" letterSpacing="widest" color="text.muted">
+                      Full Name, Role, Company, Contact, Notice Note
+                    </Text>
+                  </VStack>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+                    <FormControl>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        Full Name
+                      </FormLabel>
+                      <Input
+                        placeholder="Full name"
+                        {...register('header.name')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        Role
+                      </FormLabel>
+                      <Input
+                        placeholder="Role / Title"
+                        {...register('header.headline')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        Company Name
+                      </FormLabel>
+                      <Input
+                        placeholder="Company"
+                        {...register('header.company')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        Mobile Number
+                      </FormLabel>
+                      <Input
+                        placeholder="+91-xxxxxxxxxx"
+                        {...register('header.phone')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        Email
+                      </FormLabel>
+                      <Input
+                        placeholder="name@email.com"
+                        {...register('header.email')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        Location
+                      </FormLabel>
+                      <Input
+                        placeholder="City, Country"
+                        {...register('header.location')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        LinkedIn URL
+                      </FormLabel>
+                      <Input
+                        placeholder="https://www.linkedin.com/in/..."
+                        {...register('header.linkedin')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                      />
+                    </FormControl>
+                    <FormControl gridColumn={{ base: 'auto', md: 'span 2' }}>
+                      <FormLabel fontSize="xs" color="text.subtle">
+                        Notice Note
+                      </FormLabel>
+                      <Textarea
+                        placeholder="Serving Notice Period – Available to Join: May 5, 2026"
+                        {...register('header.noticeNote')}
+                        bg="surface.card"
+                        borderColor="border.muted"
+                        _hover={{ borderColor: 'brand.300' }}
+                        minH="96px"
+                      />
+                    </FormControl>
+                  </SimpleGrid>
+                </Box>
+                <Stack spacing={4}>
                   {fields.map((section, index) => (
                     <SectionEditor
                       key={section.id}
@@ -170,18 +305,20 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
               </Stack>
             </GridItem>
             <GridItem display={{ base: 'none', xl: 'flex' }} borderLeftWidth="1px" borderColor="border.muted" flexDir="column" bg="surface.card" minW={`${PREVIEW_MIN_WIDTH}px`}>
-              <Flex px={10} py={7} align="center" justify="space-between">
-                <Heading fontSize="lg" color="text.primary">
-                  PDF Preview
-                </Heading>
-                <Text fontSize="sm" color="text.muted">
-                  Refresh after saving edits.
-                </Text>
+              <Flex px={6} py={4} justify="center">
+                <Flex w="full" maxW="820px" align="center" justify="space-between">
+                  <Heading fontSize="lg" color="text.primary">
+                    PDF Preview
+                  </Heading>
+                  <Text fontSize="xs" color="text.muted">
+                    Refresh after saving edits.
+                  </Text>
+                </Flex>
               </Flex>
-              <Flex flex="1" px={8} pb={10}>
-                <Box w="full" h="full" borderRadius="2xl" borderWidth="1px" borderColor="border.muted" overflow="hidden" bg="surface.subtle">
+              <Flex flex="1" px={6} pb={6} justify="center">
+                <Box w="full" maxW="820px" h="full" borderRadius="xl" borderWidth="1px" borderColor="border.muted" overflow="hidden" bg="surface.subtle">
                   {pdfUrl ? (
-                    <iframe title="Resume preview" src={pdfUrl} style={{ width: '100%', height: '100%', border: 'none' }} />
+                    <iframe key={pdfUrl} title="Resume preview" src={pdfUrl} style={{ width: '100%', height: '100%', border: 'none' }} />
                   ) : (
                     <Flex align="center" justify="center" h="full" px={6} textAlign="center" color="text.muted" bg="surface.card">
                       Generate a resume to see it here.
@@ -193,7 +330,7 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
           </Grid>
         </ModalBody>
         <ModalFooter borderTopWidth="1px" borderColor="border.muted" bg="surface.card">
-          <HStack w="full" justify="flex-end" spacing={4}>
+          <HStack w="full" justify="flex-end" spacing={2}>
             <Button variant="ghost" colorScheme="gray" onClick={onClose}>
               Cancel
             </Button>
@@ -249,10 +386,10 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
   });
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="2xl" p={{ base: 5, md: 6 }} bg="surface.card" boxShadow="sm">
-      <HStack justify="space-between" align="flex-start" mb={4}>
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="xl" p={{ base: 4, md: 5 }} bg="surface.card" boxShadow="sm">
+      <HStack justify="space-between" align="flex-start" mb={3}>
         <VStack align="flex-start" spacing={0}>
-          <Heading fontSize="lg" color="text.primary">
+          <Heading fontSize="md" color="text.primary">
             {sectionTitle || 'Untitled Section'}
           </Heading>
           <Text fontSize="xs" textTransform="uppercase" letterSpacing="widest" color="text.muted">
@@ -264,13 +401,13 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
         </Tooltip>
       </HStack>
 
-      <Stack spacing={5}>
+      <Stack spacing={4}>
         <Input placeholder="Section Title" {...register(`${path}.title` as const)} bg="surface.card" borderColor="border.muted" _hover={{ borderColor: 'brand.300' }} />
 
         {kind === SectionKind.Summary && (
           <Textarea
             placeholder="Write a compelling, professional summary tailored to the job."
-            minH="160px"
+            minH="180px"
             {...register(`${path}.paragraphs` as const)}
             bg="white"
             borderColor="gray.200"
@@ -279,8 +416,8 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
         )}
 
         {kind === SectionKind.TechnicalSkills && (
-          <Stack spacing={4}>
-            <Text fontSize="sm" color="text.subtle">
+          <Stack spacing={3}>
+            <Text fontSize="xs" color="text.subtle">
               List only skills per category, separated by commas.
             </Text>
             {categoryFields.map((field, idx) => (
@@ -298,7 +435,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
                   render={({ field: controllerField }) => (
                     <Textarea
                       placeholder="Skills (comma separated)"
-                      minH="120px"
+                      minH="132px"
                       value={controllerField.value}
                       onChange={controllerField.onChange}
                       bg="surface.card"
@@ -317,62 +454,67 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
         )}
 
         {kind === SectionKind.Experience && (
-          <Stack spacing={6}>
-            <Text fontSize="sm" color="text.subtle">
-              Provide details for each role. Bullets support Shift+Enter for multi-line editing.
-            </Text>
-            <Tabs variant="soft-rounded" colorScheme="brand" isLazy>
-              <Flex justify="space-between" align={{ base: 'stretch', md: 'center' }} gap={3} flexWrap="wrap">
-                <TabList overflowX="auto" flex="1" bg="surface.subtle" borderRadius="full" px={2} py={1}>
-                  {experienceFields.length > 0 ? (
-                    experienceFields.map((field, idx) => (
-                      <Tab key={field.id} whiteSpace="nowrap">
-                        {experienceValues[idx]?.role || `Experience ${idx + 1}`}
-                      </Tab>
-                    ))
-                  ) : (
-                    <Tab isDisabled>No roles yet</Tab>
-                  )}
-                </TabList>
-                <Button
-                  size="sm"
-                  leftIcon={<Icon as={FiPlus} />}
-                  variant="outline"
-                  colorScheme="gray"
-                  onClick={() =>
-                    appendExperience({
-                      role: '',
-                      company: '',
-                      location: '',
-                      date_range: '',
-                      bullets: '',
-                    })
-                  }
-                >
-                  Add Role
-                </Button>
-              </Flex>
-              {experienceFields.length > 0 ? (
-                <TabPanels>
-                  {experienceFields.map((field, idx) => (
-                    <TabPanel key={field.id} px={0} pt={4}>
-                      <Stack spacing={4}>
-                        <Input
-                          placeholder="Role"
-                          {...register(`${path}.experiences.${idx}.role` as const)}
-                          bg="surface.card"
-                          borderColor="border.muted"
-                          _hover={{ borderColor: 'brand.300' }}
-                        />
-                        <Input
-                          placeholder="Company"
-                          {...register(`${path}.experiences.${idx}.company` as const)}
-                          bg="surface.card"
-                          borderColor="border.muted"
-                          _hover={{ borderColor: 'brand.300' }}
-                        />
-                        <HStack spacing={3}>
+          <Stack spacing={3}>
+            <Flex justify="flex-end">
+              <Button
+                size="xs"
+                leftIcon={<Icon as={FiPlus} />}
+                variant="outline"
+                colorScheme="gray"
+                onClick={() =>
+                  appendExperience({
+                    role: '',
+                    company: '',
+                    location: '',
+                    date_range: '',
+                    bullets: '',
+                  })
+                }
+              >
+                Add Role
+              </Button>
+            </Flex>
+            {experienceFields.length > 0 ? (
+              <Stack spacing={3}>
+                {experienceFields.map((field, idx) => {
+                  const role = experienceValues[idx]?.role?.trim() || 'Untitled Role';
+                  const company = experienceValues[idx]?.company?.trim() || 'Unknown Company';
+
+                  return (
+                    <Box key={field.id} borderWidth="1px" borderColor="border.muted" borderRadius="md" p={2.5} bg="surface.card">
+                      <Stack spacing={2}>
+                        <HStack justify="space-between" align="center">
+                          <Heading fontSize="xs" fontWeight="semibold" color="text.primary">
+                            {`${role}-${company}`}
+                          </Heading>
+                          <IconButton
+                            aria-label="Remove role"
+                            icon={<Icon as={FiTrash2} />}
+                            size="xs"
+                            variant="ghost"
+                            colorScheme="red"
+                            onClick={() => removeExperience(idx)}
+                          />
+                        </HStack>
+                        <SimpleGrid columns={{ base: 1, md: 2, xl: 4 }} spacing={2}>
                           <Input
+                            size="sm"
+                            placeholder="Role"
+                            {...register(`${path}.experiences.${idx}.role` as const)}
+                            bg="surface.card"
+                            borderColor="border.muted"
+                            _hover={{ borderColor: 'brand.300' }}
+                          />
+                          <Input
+                            size="sm"
+                            placeholder="Company"
+                            {...register(`${path}.experiences.${idx}.company` as const)}
+                            bg="surface.card"
+                            borderColor="border.muted"
+                            _hover={{ borderColor: 'brand.300' }}
+                          />
+                          <Input
+                            size="sm"
                             placeholder="Location"
                             {...register(`${path}.experiences.${idx}.location` as const)}
                             bg="surface.card"
@@ -380,59 +522,44 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
                             _hover={{ borderColor: 'brand.300' }}
                           />
                           <Input
+                            size="sm"
                             placeholder="Date Range"
                             {...register(`${path}.experiences.${idx}.date_range` as const)}
                             bg="surface.card"
                             borderColor="border.muted"
                             _hover={{ borderColor: 'brand.300' }}
                           />
-                        </HStack>
+                        </SimpleGrid>
                         <Textarea
+                          size="sm"
                           placeholder="Bullets (one per line)"
-                          minH="200px"
+                          minH="300px"
+                          resize="vertical"
                           {...register(`${path}.experiences.${idx}.bullets` as const)}
                           bg="surface.card"
                           borderColor="border.muted"
                           _hover={{ borderColor: 'brand.300' }}
                         />
-                        <Button leftIcon={<Icon as={FiTrash2} />} colorScheme="red" variant="ghost" alignSelf="flex-start" onClick={() => removeExperience(idx)}>
-                          Remove Role
-                        </Button>
                       </Stack>
-                    </TabPanel>
-                  ))}
-                </TabPanels>
-              ) : (
-                <Box mt={4}>
-                  <Text fontSize="sm" color="text.muted" mb={3}>
-                    Start by adding your first role.
-                  </Text>
-                  <Button
-                    leftIcon={<Icon as={FiPlus} />}
-                    onClick={() =>
-                      appendExperience({
-                        role: '',
-                        company: '',
-                        location: '',
-                        date_range: '',
-                        bullets: '',
-                      })
-                    }
-                    colorScheme="brand"
-                  >
-                    Add Role
-                  </Button>
-                </Box>
-              )}
-            </Tabs>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            ) : (
+              <Box>
+                <Text fontSize="sm" color="text.muted">
+                  Start by adding your first role.
+                </Text>
+              </Box>
+            )}
           </Stack>
         )}
 
         {kind === SectionKind.Generic && (
-          <Stack spacing={4}>
+          <Stack spacing={3}>
             <Textarea
               placeholder="Paragraphs (separate with blank lines)"
-              minH="120px"
+              minH="132px"
               {...register(`${path}.paragraphs` as const)}
               bg="surface.card"
               borderColor="border.muted"
@@ -440,7 +567,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
             />
             <Textarea
               placeholder="Bullets (one per line)"
-              minH="120px"
+              minH="132px"
               {...register(`${path}.bullets` as const)}
               bg="surface.card"
               borderColor="border.muted"
@@ -450,10 +577,10 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
         )}
 
         {kind !== SectionKind.Summary && kind !== SectionKind.TechnicalSkills && kind !== SectionKind.Experience && kind !== SectionKind.Generic && (
-          <Stack spacing={4}>
+          <Stack spacing={3}>
             <Textarea
               placeholder="Paragraphs (separate with blank lines)"
-              minH="120px"
+              minH="132px"
               {...register(`${path}.paragraphs` as const)}
               bg="surface.card"
               borderColor="border.muted"
@@ -461,7 +588,7 @@ function SectionEditor({ control, register, watch, index, onRemove }: SectionEdi
             />
             <Textarea
               placeholder="Bullets (one per line)"
-              minH="120px"
+              minH="132px"
               {...register(`${path}.bullets` as const)}
               bg="surface.card"
               borderColor="border.muted"

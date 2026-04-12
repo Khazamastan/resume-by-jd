@@ -14,15 +14,14 @@ import {
   useBreakpointValue,
   VStack,
 } from '@chakra-ui/react';
-import { useCallback } from 'react';
-import { FiDownload, FiExternalLink, FiFileText, FiPenTool } from 'react-icons/fi';
+import { useEffect, useState } from 'react';
+import { FiFileText, FiPenTool } from 'react-icons/fi';
 
 import { usePdfUrl } from '@/features/shared/usePdfUrl';
 
 interface ResumePreviewProps {
   pdfBase64: string | null;
   isLoading: boolean;
-  downloadFileName: string;
   profileName?: string;
   onEdit?: () => void;
 }
@@ -30,48 +29,36 @@ interface ResumePreviewProps {
 export function ResumePreview({
   pdfBase64,
   isLoading,
-  downloadFileName,
   profileName,
   onEdit,
 }: ResumePreviewProps) {
   const pdfUrl = usePdfUrl(pdfBase64);
   const aspect = useBreakpointValue({ base: 3 / 4, md: 210 / 297 }) ?? 210 / 297;
+  const [isPdfFrameLoading, setIsPdfFrameLoading] = useState<boolean>(Boolean(pdfUrl));
 
-  const handleDownload = useCallback(() => {
-    if (!pdfUrl) {
-      return;
-    }
-    const anchor = document.createElement('a');
-    anchor.href = pdfUrl;
-    anchor.download = downloadFileName;
-    anchor.click();
-  }, [downloadFileName, pdfUrl]);
-
-  const handleOpenNewTab = useCallback(() => {
-    if (!pdfUrl) {
-      return;
-    }
-    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+  useEffect(() => {
+    setIsPdfFrameLoading(Boolean(pdfUrl));
   }, [pdfUrl]);
+
+  const showLoader = pdfUrl ? isPdfFrameLoading : isLoading;
 
   return (
     <Stack
-      spacing={6}
-      h="full"
+      spacing={4}
       bg="surface.card"
       border="1px solid"
       borderColor="border.muted"
-      borderRadius="2xl"
-      p={{ base: 6, md: 8 }}
+      borderRadius="xl"
+      p={{ base: 4, md: 5 }}
       boxShadow="md"
     >
       <HStack justify="space-between" align="flex-start">
-        <VStack align="flex-start" spacing={2}>
-          <Heading fontSize="xl" fontWeight="semibold">
-            Preview &amp; Download
+        <VStack align="flex-start" spacing={1}>
+          <Heading fontSize="lg" fontWeight="semibold">
+            Preview
           </Heading>
           <HStack spacing={2}>
-            <Badge colorScheme={pdfUrl ? 'green' : 'yellow'} variant="subtle">
+            <Badge colorScheme="brand" variant={pdfUrl ? 'subtle' : 'outline'}>
               {pdfUrl ? 'Up to date' : 'Awaiting generation'}
             </Badge>
             {profileName && (
@@ -80,9 +67,9 @@ export function ResumePreview({
               </Text>
             )}
           </HStack>
-          <Text color="text.subtle" fontSize="sm">
+          <Text color="text.subtle" fontSize="xs">
             {pdfUrl
-              ? 'Download the current PDF or jump back into the editor to refine.'
+              ? 'Review the current PDF and jump back into the editor to refine.'
               : 'Generate a resume to unlock the live preview and editing tools.'}
           </Text>
         </VStack>
@@ -95,56 +82,48 @@ export function ResumePreview({
         )}
       </HStack>
 
-      <Box flex="1" rounded="xl" overflow="hidden" position="relative" border="1px solid" borderColor="border.muted" bg="surface.subtle">
+      <Box
+        w="full"
+        maxW={{ base: '100%', xl: '1160px' }}
+        mx="auto"
+        rounded="lg"
+        overflow="hidden"
+        position="relative"
+        border="1px solid"
+        borderColor="border.muted"
+        bg="surface.subtle"
+      >
         <AspectRatio ratio={aspect}>
           <>
             {pdfUrl ? (
               <iframe
+                key={pdfUrl}
                 title="Resume preview"
                 src={pdfUrl}
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 aria-label="Generated resume preview"
+                onLoad={() => setIsPdfFrameLoading(false)}
+                onError={() => setIsPdfFrameLoading(false)}
               />
             ) : (
-              <Center h="full" flexDir="column" gap={3} bg="surface.card" px={6}>
+              <Center h="full" flexDir="column" gap={2} bg="surface.card" px={5}>
                 <Icon as={FiFileText} boxSize={10} color="text.muted" />
                 <Text color="text.muted" textAlign="center" maxW="320px">
-                  Your generated resume will appear here. Upload at least a reference resume to begin (add a profile file
-                  if you have one handy).
+                  Your generated resume will appear here. You can upload files, or generate using default project files.
                 </Text>
-                <Text color="text.muted" fontSize="sm">
-                  Step 1: Use the panel on the left to upload your files.
+                <Text color="text.muted" fontSize="xs">
+                  Step 1: Click Generate Resume (uploads are optional).
                 </Text>
               </Center>
             )}
           </>
         </AspectRatio>
-        {isLoading && (
+        {showLoader && (
           <Center position="absolute" inset={0} bg="rgba(255,255,255,0.7)" backdropFilter="blur(2px)">
             <Spinner size="xl" color="brand.500" thickness="4px" />
           </Center>
         )}
       </Box>
-
-      <HStack spacing={3} justify="flex-end" flexWrap="wrap">
-        <Button
-          leftIcon={<Icon as={FiExternalLink} />}
-          variant="ghost"
-          colorScheme="gray"
-          onClick={handleOpenNewTab}
-          isDisabled={!pdfUrl}
-        >
-          Open in new tab
-        </Button>
-        <Button
-          leftIcon={<Icon as={FiDownload} />}
-          colorScheme="brand"
-          onClick={handleDownload}
-          isDisabled={!pdfUrl}
-        >
-          Download
-        </Button>
-      </HStack>
     </Stack>
   );
 }

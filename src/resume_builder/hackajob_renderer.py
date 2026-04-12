@@ -45,6 +45,7 @@ CARD_PAD_TOP = 10
 CARD_PAD_BOTTOM = 10
 CARD_BORDER_WIDTH = 0.75
 DIVIDER_LINE_WIDTH = 0.65
+DEFAULT_NOTICE_PERIOD_NOTE = "Serving Notice Period – Available to Join: May 5, 2026"
 
 HACKAJOB_MEDIUM = "HackajobSpaceGroteskMedium"
 HACKAJOB_BOLD = "HackajobSpaceGroteskBold"
@@ -255,6 +256,12 @@ def _normalize_company_key(company: str) -> str:
         return "nineleaps"
     if "pwc" in lowered:
         return "pwc"
+    if "elocity" in lowered:
+        return "elocity"
+    if "peepal" in lowered:
+        return "peepal"
+    if "talent flake" in lowered or "talentflake" in lowered:
+        return "talentflake"
     if "minewhat" in lowered:
         return "minewhat"
     if "thrymr" in lowered:
@@ -268,6 +275,12 @@ def _display_company_name(company: str) -> str:
         return "PwC"
     if key == "nineleaps":
         return "Nineleaps Technology"
+    if key == "elocity":
+        return "Elocity Technologies"
+    if key == "peepal":
+        return "Peepal Consulting"
+    if key == "talentflake":
+        return "Talent Flake Pvt. Ltd"
     return _clean_text(company)
 
 
@@ -420,6 +433,40 @@ def _derive_entry_chips(entry: Dict[str, object], skill_pool: Sequence[str]) -> 
 
 def _experience_entries(document: ResumeDocument, skill_pool: Sequence[str]) -> List[_ExperienceEntry]:
     entries: List[_ExperienceEntry] = []
+    experience_section = _section_by_title(document.sections, "experience")
+    if experience_section:
+        meta_entries = experience_section.meta.get("entries", []) or []
+        for item in meta_entries:
+            if not isinstance(item, dict):
+                continue
+            if item.get("start") or item.get("end"):
+                start_text, end_text, date_range = _format_hackajob_date_parts(item.get("start"), item.get("end"))
+            else:
+                date_range = _clean_text(item.get("date_range"))
+                start_text, end_text = _split_date_range_text(date_range)
+            start_dt = _parse_date(item.get("start"))
+            end_raw = _clean_text(item.get("end"))
+            end_dt = _parse_date(item.get("end")) if end_raw and end_raw.lower() not in {"present", "current"} else None
+            start_iso = start_dt.strftime("%Y-%m-%d") if start_dt else ""
+            end_iso = "Present" if end_raw.lower() in {"present", "current", ""} else (end_dt.strftime("%Y-%m-%d") if end_dt else "")
+            entries.append(
+                _ExperienceEntry(
+                    company=_display_company_name(_clean_text(item.get("company"))),
+                    role=_clean_text(item.get("role") or item.get("title")),
+                    location=_clean_text(item.get("location")),
+                    date_range=date_range,
+                    chips=_derive_entry_chips(item, skill_pool),
+                    bullets=[_clean_text(b) for b in item.get("bullets", []) or [] if _clean_text(b)],
+                    start_date=start_text,
+                    end_date=end_text,
+                    start_date_iso=start_iso,
+                    end_date_iso=end_iso,
+                )
+            )
+
+    if entries:
+        return entries
+
     for item in document.profile.experience:
         company = _display_company_name(_clean_text(item.get("company")))
         role = _clean_text(item.get("role") or item.get("title"))
@@ -446,40 +493,6 @@ def _experience_entries(document: ResumeDocument, skill_pool: Sequence[str]) -> 
                 end_date_iso=end_iso,
             )
         )
-
-    if entries:
-        return entries
-
-    experience_section = _section_by_title(document.sections, "experience")
-    if experience_section:
-        meta_entries = experience_section.meta.get("entries", []) or []
-        for item in meta_entries:
-            if not isinstance(item, dict):
-                continue
-            if item.get("start") or item.get("end"):
-                start_text, end_text, date_range = _format_hackajob_date_parts(item.get("start"), item.get("end"))
-            else:
-                date_range = _clean_text(item.get("date_range"))
-                start_text, end_text = _split_date_range_text(date_range)
-            start_dt = _parse_date(item.get("start"))
-            end_raw = _clean_text(item.get("end"))
-            end_dt = _parse_date(item.get("end")) if end_raw and end_raw.lower() not in {"present", "current"} else None
-            start_iso = start_dt.strftime("%Y-%m-%d") if start_dt else ""
-            end_iso = "Present" if end_raw.lower() in {"present", "current", ""} else (end_dt.strftime("%Y-%m-%d") if end_dt else "")
-            entries.append(
-                _ExperienceEntry(
-                    company=_display_company_name(_clean_text(item.get("company"))),
-                    role=_clean_text(item.get("role")),
-                    location=_clean_text(item.get("location")),
-                    date_range=date_range,
-                    chips=_derive_entry_chips(item, skill_pool),
-                    bullets=[_clean_text(b) for b in item.get("bullets", []) or [] if _clean_text(b)],
-                    start_date=start_text,
-                    end_date=end_text,
-                    start_date_iso=start_iso,
-                    end_date_iso=end_iso,
-                )
-            )
     return entries
 
 
@@ -566,6 +579,16 @@ def _headline_text(document: ResumeDocument) -> str:
     return headline
 
 
+def _notice_period_note(document: ResumeDocument) -> str:
+    contact = document.profile.contact or {}
+    note = _clean_text(
+        contact.get("notice_note")
+        or contact.get("noticeNote")
+        or contact.get("notice")
+    )
+    return note or DEFAULT_NOTICE_PERIOD_NOTE
+
+
 def _header_contact_items(document: ResumeDocument) -> List[Tuple[str, str, str]]:
     contact = document.profile.contact or {}
     items: List[Tuple[str, str, str]] = []
@@ -580,8 +603,45 @@ def _header_contact_items(document: ResumeDocument) -> List[Tuple[str, str, str]
     if location:
         items.append(("location", location, ""))
     if linkedin:
-        items.append(("linkedin", "LinkedIn", ""))
+        linkedin_href = (
+            linkedin
+            if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", linkedin)
+            else f"https://{linkedin.lstrip('/')}"
+        )
+        items.append(("linkedin", "LinkedIn", linkedin_href))
     return items
+
+
+def _header_companies(document: ResumeDocument) -> List[str]:
+    companies: List[str] = []
+    seen: set[str] = set()
+
+    def add_company(raw_company: object) -> None:
+        cleaned = _clean_text(raw_company)
+        if not cleaned:
+            return
+        display_name = _display_company_name(cleaned)
+        normalized_key = _normalize_company_key(display_name)
+        dedupe_key = normalized_key if normalized_key != "generic" else display_name.lower()
+        if dedupe_key in seen:
+            return
+        seen.add(dedupe_key)
+        companies.append(display_name)
+
+    for item in document.profile.experience:
+        if isinstance(item, dict):
+            add_company(item.get("company"))
+
+    if companies:
+        return companies
+
+    experience_section = _section_by_title(document.sections, "experience")
+    if experience_section:
+        for item in experience_section.meta.get("entries", []) or []:
+            if isinstance(item, dict):
+                add_company(item.get("company"))
+
+    return companies
 
 
 def _skill_category_lines(section: ResumeSection | None, fallback: Iterable[str]) -> List[Tuple[str, List[str]]]:
@@ -1222,34 +1282,31 @@ class _HackajobRenderer:
             contact_h = self._draw_contact_row(current_top, text_x, content_width, contact_items)
             current_top += contact_h + 2
 
-        current_top += 8
-        label_para, label_height = _measure_paragraph(
-            previous_label,
-            ParagraphStyle(
-                "HackajobHeaderSmall",
-                parent=self.headline_style,
-                fontName=self.font_bold,
-                fontSize=9,
-                leading=11,
-            ),
-            90,
-        )
-        label_para.drawOn(self.canvas, text_x, self._to_canvas_y(current_top, label_height))
+        companies = _header_companies(self.document)
+        if companies:
+            current_top += 8
+            label_para, label_height = _measure_paragraph(
+                previous_label,
+                ParagraphStyle(
+                    "HackajobHeaderSmall",
+                    parent=self.headline_style,
+                    fontName=self.font_bold,
+                    fontSize=9,
+                    leading=11,
+                ),
+                90,
+            )
+            label_para.drawOn(self.canvas, text_x, self._to_canvas_y(current_top, label_height))
 
-        companies = [
-            "Oracle",
-            "Xactly",
-            "Nineleaps",
-            "PwC",
-            "Minewhat",
-            "Thrymr",
-        ]
-        logo_x = 165
-        logo_size = 18.5
-        logo_y = self._to_canvas_y(current_top - 2, logo_size)
-        for company in companies:
-            self._draw_company_logo(company, logo_x, logo_y, logo_size, context="header")
-            logo_x += 22
+            logo_size = 18.5
+            logo_x = text_x + 98
+            logo_y = self._to_canvas_y(current_top - 2, logo_size)
+            max_logo_x = self.page_width - OUTER_MARGIN - logo_size
+            for company in companies:
+                if logo_x > max_logo_x:
+                    break
+                self._draw_company_logo(company, logo_x, logo_y, logo_size, context="header")
+                logo_x += 22
 
     def _available_height(self) -> float:
         return self.page_height - BOTTOM_MARGIN - self.cursor_top
@@ -1641,9 +1698,8 @@ class _HackajobRenderer:
                     self.canvas.setStrokeColor(colors.HexColor("#e8e8e8"))
                     self.canvas.setLineWidth(CARD_BORDER_WIDTH)
                     self.canvas.roundRect(content_x, box_y, icon_box_size, icon_box_size, 6, stroke=1, fill=0)
-                    icon_candidates = [LOGO_DIR / "Logonew.png", ICON_DIR / "education.png"]
-                    icon_path = next((path for path in icon_candidates if path.exists()), None)
-                    if icon_path:
+                    icon_path = ICON_DIR / "education.png"
+                    if icon_path.exists():
                         icon_size = 22
                         icon_x = content_x + (icon_box_size - icon_size) / 2
                         icon_y = box_y + (icon_box_size - icon_size) / 2
@@ -1656,6 +1712,8 @@ class _HackajobRenderer:
                             preserveAspectRatio=True,
                             mask="auto",
                         )
+                    else:
+                        self._draw_briefcase_badge(content_x + 5, box_y + 5, icon_box_size - 10)
                     text_x = content_x + 54
                     inst_para = segment.payload["institution"]
                     inst_h = float(segment.payload["inst_h"])
@@ -1763,6 +1821,35 @@ class _HackajobRenderer:
         self.canvas.drawText(text_obj)
         self.canvas.restoreState()
 
+    def _draw_notice_period_note(self) -> None:
+        note = _notice_period_note(self.document)
+        if not note:
+            return
+
+        note_style = ParagraphStyle(
+            "HackajobNoticePeriodNote",
+            parent=self.body_style,
+            fontName=self.font_medium,
+            fontSize=9.0,
+            leading=11.0,
+            textColor=self.palette.text_muted,
+        )
+        if note.lower().startswith("note:"):
+            note_markup = html.escape(note, quote=False)
+        else:
+            note_markup = f'<font face="{self.font_bold}">Note:</font> {html.escape(note, quote=False)}'
+        note_para = Paragraph(note_markup, note_style)
+        note_width = self.card_width - (CARD_PAD_X * 2)
+        _, note_height = note_para.wrap(note_width, 10000)
+        note_height = float(note_height)
+
+        needed_height = note_height + 2
+        self._ensure_space(needed_height)
+
+        note_top = self.cursor_top
+        note_para.drawOn(self.canvas, OUTER_MARGIN + CARD_PAD_X, self._to_canvas_y(note_top, note_height))
+        self.cursor_top += note_height + CARD_GAP
+
     def render(self) -> Path:
         self._start_page(first_page=True)
         self._draw_about_card()
@@ -1770,6 +1857,7 @@ class _HackajobRenderer:
         self._draw_experience_card(skills)
         self._draw_education_card()
         self._draw_awards_card()
+        self._draw_notice_period_note()
         self.canvas.save()
         return self.dest
 

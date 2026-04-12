@@ -2,11 +2,13 @@ import { useMutation } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 
 import { generateResume, GenerateResumeParams, updateResume } from '@/features/generator/api';
-import type { ResumeDocumentPayload, ResumeSection } from '@/features/shared/types';
+import type { ResumeDocumentPayload, ResumeProfile, ResumeSection } from '@/features/shared/types';
 
 export interface UpdateResumeArgs {
   resumeId: string;
   sections: ResumeSection[];
+  profile: ResumeProfile;
+  theme?: Record<string, unknown>;
 }
 
 export function useResumeSession() {
@@ -20,7 +22,7 @@ export function useResumeSession() {
 
   const updateMutation = useMutation({
     mutationKey: ['update-resume'],
-    mutationFn: ({ resumeId, sections }: UpdateResumeArgs) => updateResume(resumeId, { sections }),
+    mutationFn: ({ resumeId, sections, profile, theme }: UpdateResumeArgs) => updateResume(resumeId, { sections, profile, theme }),
     onSuccess: (data) => setSession(data),
   });
 
