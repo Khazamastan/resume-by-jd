@@ -23,6 +23,29 @@ class _Line:
     is_bullet: bool
 
 
+def _dominant_text(values: List[str], fallback: str) -> str:
+    counts: Dict[str, int] = {}
+    for value in values:
+        cleaned = str(value or "").strip()
+        if not cleaned:
+            continue
+        counts[cleaned] = counts.get(cleaned, 0) + 1
+    if not counts:
+        return fallback
+    return max(counts, key=counts.get)
+
+
+def _font_weight_hint(font_name: str) -> str:
+    token = (font_name or "").lower()
+    if any(part in token for part in ("black", "heavy", "extrabold", "ultrabold", "semibold", "demi", "bold")):
+        return "bold"
+    if "medium" in token:
+        return "medium"
+    if any(part in token for part in ("light", "thin", "book")):
+        return "light"
+    return "regular"
+
+
 def _color_to_hex(color: Iterable[float] | None) -> str:
     if not color:
         return "#000000"
@@ -196,6 +219,29 @@ def _is_heading(line: _Line, body_size: float) -> bool:
     return False
 
 
+def _build_section_reference_style(
+    heading_line: _Line | None,
+    content_lines: List[_Line],
+    theme: Theme,
+) -> Dict[str, str]:
+    heading_font = (heading_line.dominant_font if heading_line else "") or theme.heading_font or theme.body_font
+    heading_color = (heading_line.dominant_color if heading_line else "") or theme.accent_color or theme.primary_color
+
+    content_fonts = [line.dominant_font for line in content_lines if line.dominant_font]
+    content_colors = [line.dominant_color for line in content_lines if line.dominant_color]
+    body_font = _dominant_text(content_fonts, theme.body_font or heading_font)
+    body_color = _dominant_text(content_colors, theme.primary_color or heading_color)
+
+    return {
+        "heading_font": heading_font,
+        "heading_weight": _font_weight_hint(heading_font),
+        "heading_color": heading_color,
+        "body_font": body_font,
+        "body_weight": _font_weight_hint(body_font),
+        "body_color": body_color,
+    }
+
+
 def extract_reference_structure(reference_pdf: str | Path) -> ReferenceStructure:
     """Parse the reference resume PDF to infer theme and high-level sections."""
     ref_path = Path(reference_pdf)
@@ -237,20 +283,37 @@ def extract_reference_structure(reference_pdf: str | Path) -> ReferenceStructure
     lines = _collect_lines(all_words)
     sections: List[ResumeSection] = []
     current_section: ResumeSection | None = None
+    current_section_heading: _Line | None = None
+    current_section_lines: List[_Line] = []
     for line in lines:
         if _is_heading(line, theme.body_size):
             if current_section:
+                current_section.meta["_reference_style"] = _build_section_reference_style(
+                    current_section_heading,
+                    current_section_lines,
+                    theme,
+                )
                 sections.append(current_section)
             current_section = ResumeSection(title=line.text.title())
+            current_section_heading = line
+            current_section_lines = []
             continue
         if not current_section:
             current_section = ResumeSection(title="Summary")
+            current_section_heading = None
+            current_section_lines = []
+        current_section_lines.append(line)
         if line.is_bullet:
             current_section.bullets.append(line.text.lstrip("-■· ").strip())
         else:
             current_section.paragraphs.append(line.text)
 
     if current_section:
+        current_section.meta["_reference_style"] = _build_section_reference_style(
+            current_section_heading,
+            current_section_lines,
+            theme,
+        )
         sections.append(current_section)
 
     return ReferenceStructure(theme=theme, sections=sections)

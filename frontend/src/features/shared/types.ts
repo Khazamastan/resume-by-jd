@@ -34,4 +34,5 @@ export interface ResumeDocumentPayload {
   sections: ResumeSection[];
   theme: Record<string, unknown>;
   pdf: string; // base64 encoded
+  ats_pdf?: string; // base64 encoded ATS-friendly plain resume
 }

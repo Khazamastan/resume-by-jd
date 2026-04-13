@@ -7,12 +7,19 @@ def test_build_resume_document_adds_mandatory_skills():
     theme = Theme()
     reference = ReferenceStructure(theme=theme, sections=[ResumeSection(title="Skills")])
     profile = ResumeProfile(name="Alex Taylor", skills=["Python"])
-    insights = SkillInsights(mandatory=["AWS", "Python"], preferred=[])
+    insights = SkillInsights(mandatory=["React", "Python"], preferred=[])
 
     document = build_resume_document(reference, profile, insights)
 
-    skills_section = next(section for section in document.sections if section.title == "Skills")
-    assert "AWS" in skills_section.bullets
+    skills_section = next(
+        section for section in document.sections if section.title in {"Skills", "Technical Skills"}
+    )
+    collected_skills: list[str] = []
+    for category, values in skills_section.meta.get("category_lines", []):
+        if isinstance(values, (list, tuple)):
+            collected_skills.extend(str(value) for value in values)
+    collected_skills.extend(skills_section.bullets)
+    assert "React" in collected_skills
     assert document.profile.skills == ["Python"]
 
 
@@ -90,3 +97,78 @@ def test_format_experience_entry_trims_leading_dash_when_no_start_date():
     experience_section = next(section for section in document.sections if section.title == "Professional Experience")
     entry = experience_section.meta["entries"][0]
     assert entry["date_range"] == "Present"
+
+
+def test_build_resume_document_carries_reference_section_style_metadata():
+    reference = ReferenceStructure(
+        theme=Theme(),
+        sections=[
+            ResumeSection(
+                title="Skills",
+                meta={
+                    "_reference_style": {
+                        "heading_weight": "bold",
+                        "heading_color": "#112233",
+                        "body_weight": "regular",
+                        "body_color": "#223344",
+                    }
+                },
+            ),
+            ResumeSection(
+                title="Professional Experience",
+                meta={
+                    "_reference_style": {
+                        "heading_weight": "bold",
+                        "heading_color": "#334455",
+                        "body_weight": "light",
+                        "body_color": "#445566",
+                    }
+                },
+            ),
+        ],
+    )
+    profile = ResumeProfile(
+        name="Alex Taylor",
+        skills=["React", "TypeScript"],
+        experience=[
+            {
+                "role": "Senior Engineer",
+                "company": "Example",
+                "start": "2022-01-01",
+                "end": "Present",
+                "location": "Remote",
+                "bullets": ["Built ATS-safe resumes."],
+            }
+        ],
+    )
+
+    document = build_resume_document(reference, profile, SkillInsights())
+
+    skills_section = next(section for section in document.sections if section.title == "Technical Skills")
+    experience_section = next(section for section in document.sections if section.title == "Professional Experience")
+
+    assert skills_section.meta.get("_reference_style", {}).get("heading_color") == "#112233"
+    assert experience_section.meta.get("_reference_style", {}).get("body_weight") == "light"
+
+
+def test_build_resume_document_uses_explicit_skill_categories_from_profile_schema():
+    reference = ReferenceStructure(theme=Theme(), sections=[ResumeSection(title="Skills")])
+    profile = ResumeProfile(
+        name="Khaja",
+        skills=[
+            "frontend: React.js, Next.js",
+            "backend: Node.js, Express.js",
+            "testing_profiling: Jest, Playwright",
+            "ai_devops: Codex, AWS",
+        ],
+    )
+
+    document = build_resume_document(reference, profile, SkillInsights())
+    skills_section = next(section for section in document.sections if section.title == "Technical Skills")
+    category_lines = skills_section.meta.get("category_lines", [])
+    categories = [category for category, _ in category_lines]
+
+    assert "Frontend" in categories
+    assert "Backend" in categories
+    assert "Testing & DevOps" in categories
+    assert "AI Tools" in categories

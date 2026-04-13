@@ -58,6 +58,29 @@ DEFAULT_PROFILE_PATH = PROJECT_ROOT / "profile.yaml"
 SAMPLES_ROOT = PROJECT_ROOT / "samples"
 DEFAULT_SAMPLE_PROFILE = "Khaja"
 PROFILE_FILE_CANDIDATES = ("profile.yaml", "profile.yml", "profile.json")
+ATS_FONT_CHOICES = (
+    "Calibri",
+    "Arial",
+    "Georgia",
+    "Helvetica",
+    "SpaceGrotesk",
+    "Garamond",
+    "Tahoma",
+    "Times New Roman",
+    "Cambria",
+    "Montserrat",
+    "Lato",
+    "Aptos",
+)
+_ATS_FONT_LOOKUP = {name.lower(): name for name in ATS_FONT_CHOICES}
+_ATS_FONT_LOOKUP["space grotesk"] = "SpaceGrotesk"
+
+
+def _normalize_ats_font_family(value: str | None) -> str:
+    if not value:
+        return "Calibri"
+    normalized = value.strip().lower()
+    return _ATS_FONT_LOOKUP.get(normalized, "Calibri")
 
 
 def _find_profile_file(profile_dir: Path) -> Optional[Path]:
@@ -138,7 +161,7 @@ def _theme_from_payload(payload: Optional[Dict[str, object]]) -> Theme:
     if not isinstance(payload, dict):
         return theme
 
-    text_fields = ("body_font", "heading_font", "primary_color", "accent_color", "template")
+    text_fields = ("body_font", "heading_font", "primary_color", "accent_color", "template", "ats_font_family")
     for field_name in text_fields:
         value = payload.get(field_name)
         if isinstance(value, str) and value.strip():
@@ -164,11 +187,46 @@ def _theme_from_payload(payload: Optional[Dict[str, object]]) -> Theme:
         except (TypeError, ValueError):
             continue
 
+    theme.ats_font_family = _normalize_ats_font_family(getattr(theme, "ats_font_family", None))
+
     return theme
 
 
 def _encode_pdf(pdf_bytes: bytes) -> str:
     return base64.b64encode(pdf_bytes).decode("utf-8")
+
+
+def _build_ats_theme(base_theme: Theme) -> Theme:
+    page_width = base_theme.page_width or 595.0
+    page_height = base_theme.page_height or 842.0
+    ats_font_family = _normalize_ats_font_family(getattr(base_theme, "ats_font_family", None))
+    primary_color = (base_theme.primary_color or "#111111").strip() or "#111111"
+    accent_color = (base_theme.accent_color or primary_color).strip() or primary_color
+    return Theme(
+        body_font=ats_font_family,
+        body_size=10.0,
+        heading_font=f"{ats_font_family}-Bold",
+        heading_size=12.0,
+        primary_color=primary_color,
+        accent_color=accent_color,
+        line_height=1.2,
+        margin_left=42.0,
+        margin_right=42.0,
+        margin_top=36.0,
+        margin_bottom=36.0,
+        page_width=page_width,
+        page_height=page_height,
+        template="ats",
+        ats_font_family=ats_font_family,
+    )
+
+
+def _build_ats_document(document: ResumeDocument) -> ResumeDocument:
+    return ResumeDocument(
+        profile=document.profile,
+        sections=document.sections,
+        theme=_build_ats_theme(document.theme),
+    )
 
 
 def _profile_payload(profile: ResumeProfile) -> Dict[str, object]:
@@ -217,14 +275,22 @@ def _section_payload(section: ResumeSection) -> Dict[str, object]:
     return payload
 
 
-def _document_payload(resume_id: str, document: ResumeDocument, pdf_bytes: bytes) -> Dict[str, object]:
-    return {
+def _document_payload(
+    resume_id: str,
+    document: ResumeDocument,
+    pdf_bytes: bytes,
+    ats_pdf_bytes: bytes | None = None,
+) -> Dict[str, object]:
+    payload: Dict[str, object] = {
         "resume_id": resume_id,
         "profile": _profile_payload(document.profile),
         "sections": [_section_payload(section) for section in document.sections],
         "theme": asdict(document.theme),
         "pdf": _encode_pdf(pdf_bytes),
     }
+    if ats_pdf_bytes:
+        payload["ats_pdf"] = _encode_pdf(ats_pdf_bytes)
+    return payload
 
 
 def _apply_section_update(section: ResumeSection, update: SectionUpdate) -> None:
@@ -424,6 +490,7 @@ def _build_app() -> FastAPI:
         sample_profile: str | None = Form(default=None),
         accent_color: str | None = Form(default=None),
         primary_color: str | None = Form(default=None),
+        ats_font_family: str | None = Form(default=None),
     ) -> Dict[str, object]:
         async with _temporary_workspace() as workspace:
             sample_reference_path: Path | None = None
@@ -481,6 +548,7 @@ def _build_app() -> FastAPI:
                     print(f"Profile saved to: {generated_profile_path}")
                 insights = analyze_job_description(job_contents)
                 document = build_resume_document(reference_structure, profile_data, insights)
+                document.theme.ats_font_family = _normalize_ats_font_family(ats_font_family)
                 overrides: Dict[str, str] = {}
                 if accent_color:
                     try:
@@ -501,16 +569,20 @@ def _build_app() -> FastAPI:
                 if overrides:
                     _apply_theme_overrides(document.theme, overrides)
                 render_resume(document, output_path)
+                ats_output_path = workspace.path("resume_ats.pdf")
+                ats_document = _build_ats_document(document)
+                render_resume(ats_document, ats_output_path)
             except (ValueError, FileNotFoundError) as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             except Exception as exc:  # pragma: no cover - defensive
                 raise HTTPException(status_code=500, detail="Failed to build resume.") from exc
 
             pdf_bytes = output_path.read_bytes()
+            ats_pdf_bytes = ats_output_path.read_bytes()
 
         resume_id = uuid4().hex
         RESUME_SESSIONS[resume_id] = document
-        return _document_payload(resume_id, document, pdf_bytes)
+        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes)
 
     @app.put("/api/resume/{resume_id}")
     async def update_resume(resume_id: str, payload: UpdatePayload) -> Dict[str, object]:
@@ -546,10 +618,14 @@ def _build_app() -> FastAPI:
         async with _temporary_workspace() as workspace:
             output_path = workspace.path("resume.pdf")
             render_resume(document, output_path)
+            ats_output_path = workspace.path("resume_ats.pdf")
+            ats_document = _build_ats_document(document)
+            render_resume(ats_document, ats_output_path)
             pdf_bytes = output_path.read_bytes()
+            ats_pdf_bytes = ats_output_path.read_bytes()
 
         RESUME_SESSIONS[resume_id] = document
-        return _document_payload(resume_id, document, pdf_bytes)
+        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes)
 
     @app.get("/api/resume/{resume_id}/pdf")
     async def download_resume(resume_id: str) -> StreamingResponse:

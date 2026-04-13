@@ -25,6 +25,49 @@ def _strip_citation_artifacts(raw_text: str) -> str:
     return _CITE_PATTERN.sub("", without_starts)
 
 
+def _normalize_profile_skills(raw_skills: Any) -> List[str]:
+    """Accept both legacy list schema and categorized map schema for skills."""
+    normalized: List[str] = []
+
+    def _append_category(category: object, values: object) -> None:
+        category_text = str(category).strip()
+        if not category_text:
+            return
+        items: List[str] = []
+        if isinstance(values, (list, tuple, set)):
+            for item in values:
+                item_text = str(item).strip()
+                if item_text:
+                    items.append(item_text)
+        elif values is not None:
+            value_text = str(values).strip()
+            if value_text:
+                items.append(value_text)
+        if items:
+            normalized.append(f"{category_text}: {', '.join(items)}")
+
+    if raw_skills is None:
+        return normalized
+    if isinstance(raw_skills, dict):
+        for category, values in raw_skills.items():
+            _append_category(category, values)
+        return normalized
+    if isinstance(raw_skills, (list, tuple, set)):
+        for entry in raw_skills:
+            if isinstance(entry, dict):
+                for category, values in entry.items():
+                    _append_category(category, values)
+                continue
+            text = str(entry).strip()
+            if text:
+                normalized.append(text)
+        return normalized
+    text = str(raw_skills).strip()
+    if text:
+        normalized.append(text)
+    return normalized
+
+
 def load_profile(profile_path: str | Path) -> ResumeProfile:
     """Load structured resume profile data from YAML or JSON."""
     path = _ensure_path(Path(profile_path))
@@ -57,7 +100,7 @@ def load_profile(profile_path: str | Path) -> ResumeProfile:
         education=data.get("education", []) or [],
         projects=data.get("projects", []) or [],
         certifications=data.get("certifications", []) or [],
-        skills=data.get("skills", []) or [],
+        skills=_normalize_profile_skills(data.get("skills")),
     )
 
     for section in data.get("additional_sections", []) or []:
@@ -206,6 +249,40 @@ def _canonical_additional(sections: List[ResumeSection]) -> List[OrderedDict[str
     return result
 
 
+def _canonical_skills(skills: List[str]) -> List[str] | OrderedDict[str, List[str]]:
+    grouped: OrderedDict[str, List[str]] = OrderedDict()
+    uncategorized: List[str] = []
+    has_grouped = False
+
+    for skill in skills:
+        text = str(skill).strip()
+        if not text:
+            continue
+        if ":" not in text:
+            uncategorized.append(text)
+            continue
+        category, values = text.split(":", 1)
+        category_key = re.sub(r"[^a-z0-9]+", "_", category.lower()).strip("_")
+        items = [value.strip() for value in values.split(",") if value.strip()]
+        if not category_key or not items:
+            uncategorized.append(text)
+            continue
+        has_grouped = True
+        bucket = grouped.setdefault(category_key, [])
+        for item in items:
+            if item not in bucket:
+                bucket.append(item)
+
+    if has_grouped:
+        if uncategorized:
+            grouped.setdefault("additional", [])
+            for item in uncategorized:
+                if item not in grouped["additional"]:
+                    grouped["additional"].append(item)
+        return grouped
+    return uncategorized
+
+
 def profile_to_canonical(profile: ResumeProfile) -> OrderedDict[str, Any]:
     data: OrderedDict[str, Any] = OrderedDict()
     data["name"] = profile.name
@@ -224,7 +301,7 @@ def profile_to_canonical(profile: ResumeProfile) -> OrderedDict[str, Any]:
         data["education"] = education_entries
     skills = _non_empty(list(profile.skills))
     if skills:
-        data["skills"] = skills
+        data["skills"] = _canonical_skills(skills)
     project_entries = _canonical_projects(profile.projects)
     if project_entries:
         data["projects"] = project_entries

@@ -120,7 +120,7 @@ export function ResumePreview({
         </AspectRatio>
         {showLoader && (
           <Center position="absolute" inset={0} bg="rgba(255,255,255,0.7)" backdropFilter="blur(2px)">
-            <Spinner size="xl" color="brand.500" thickness="4px" />
+            <Spinner size="xl" color="brand.500" thickness="4px" transform={{ base: 'translateY(-12px)', md: 'translateY(-18px)' }} />
           </Center>
         )}
       </Box>

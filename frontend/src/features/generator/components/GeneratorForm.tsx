@@ -46,7 +46,23 @@ interface GeneratorFormValues {
   jobDescriptionFile?: FileList;
   jobText?: string;
   accentKey: AccentKey;
+  atsFontFamily: string;
 }
+
+const ATS_FONT_OPTIONS = [
+  'Calibri',
+  'Arial',
+  'Georgia',
+  'Helvetica',
+  'SpaceGrotesk',
+  'Garamond',
+  'Tahoma',
+  'Times New Roman',
+  'Cambria',
+  'Montserrat',
+  'Lato',
+  'Aptos',
+];
 
 function fileFromList(list?: FileList | null): File | undefined {
   if (!list || list.length === 0) {
@@ -73,6 +89,7 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
       sampleProfile: defaultSampleProfileId,
       jobText: '',
       accentKey: currentAccent ?? defaultAccent,
+      atsFontFamily: 'Calibri',
     },
   });
   const [hasSubmitted, setHasSubmitted] = useBoolean();
@@ -129,6 +146,7 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
       jobText: values.jobText?.trim() ? values.jobText.trim() : undefined,
       sampleProfile: values.sampleProfile?.trim() || defaultSampleProfileId,
       accentColor,
+      atsFontFamily: values.atsFontFamily?.trim() || 'Calibri',
     });
     setHasSubmitted.on();
   });
@@ -181,7 +199,6 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
               bg="surface.card"
               borderColor="border.muted"
               _hover={{ borderColor: 'brand.300' }}
-              isDisabled={isGenerating || isSampleProfilesLoading}
             >
               {selectableSampleProfiles.map((sampleProfileOption) => (
                 <option key={sampleProfileOption.id} value={sampleProfileOption.id}>
@@ -331,6 +348,34 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
           />
           <FormHelperText color="text.muted">
             Pick the highlight color that will be applied to the generated resume.
+          </FormHelperText>
+        </FormControl>
+
+        <FormControl>
+          <FormLabel color="text.subtle">
+            ATS Font Family
+          </FormLabel>
+          <Controller
+            name="atsFontFamily"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value}
+                onChange={(event) => field.onChange(event.target.value)}
+                bg="surface.card"
+                borderColor="border.muted"
+                _hover={{ borderColor: 'brand.300' }}
+              >
+                {ATS_FONT_OPTIONS.map((fontOption) => (
+                  <option key={fontOption} value={fontOption}>
+                    {fontOption}
+                  </option>
+                ))}
+              </Select>
+            )}
+          />
+          <FormHelperText color="text.muted">
+            Applies only to ATS PDF font rendering. The regular resume design is unchanged.
           </FormHelperText>
         </FormControl>
 

@@ -22,7 +22,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FiArrowRight, FiDownload, FiExternalLink, FiRefreshCcw } from 'react-icons/fi';
 
 import { EditResumeModal } from '@/features/editor/components/EditResumeModal';
-import { buildDownloadName, defaultSampleProfileId, GenerateResumeParams } from '@/features/generator/api';
+import {
+  buildAtsDownloadName,
+  buildDownloadName,
+  defaultSampleProfileId,
+  GenerateResumeParams,
+} from '@/features/generator/api';
 import { GeneratorForm } from '@/features/generator/components/GeneratorForm';
 import { ResumePreview } from '@/features/generator/components/ResumePreview';
 import { useResumeSession } from '@/features/generator/useResumeSession';
@@ -218,6 +223,7 @@ export default function App() {
   const hasAutoBootstrapped = useRef(false);
   const [isGenerateButtonLoading, setIsGenerateButtonLoading] = useState(false);
   const pdfUrl = usePdfUrl(session?.pdf ?? null);
+  const atsPdfUrl = usePdfUrl(session?.ats_pdf ?? null);
 
   useEffect(() => {
     if (generateError) {
@@ -279,6 +285,7 @@ export default function App() {
   }, [reset, toast]);
 
   const downloadName = buildDownloadName(session?.profile?.name);
+  const atsDownloadName = buildAtsDownloadName(session?.profile?.name);
   const hasSession = Boolean(session);
   const generatorFormId = 'generator-form';
 
@@ -289,6 +296,13 @@ export default function App() {
     window.open(pdfUrl, '_blank', 'noopener,noreferrer');
   }, [pdfUrl]);
 
+  const handleOpenAtsNewTab = useCallback(() => {
+    if (!atsPdfUrl) {
+      return;
+    }
+    window.open(atsPdfUrl, '_blank', 'noopener,noreferrer');
+  }, [atsPdfUrl]);
+
   const handleDownload = useCallback(() => {
     if (!pdfUrl) {
       return;
@@ -298,6 +312,16 @@ export default function App() {
     anchor.download = downloadName;
     anchor.click();
   }, [downloadName, pdfUrl]);
+
+  const handleDownloadAts = useCallback(() => {
+    if (!atsPdfUrl) {
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = atsPdfUrl;
+    anchor.download = atsDownloadName;
+    anchor.click();
+  }, [atsDownloadName, atsPdfUrl]);
 
   return (
     <Flex direction="column" minH="100vh" bgGradient="linear(to-b, surface.canvas, surface.subtle)">
@@ -366,6 +390,15 @@ export default function App() {
               Open in new tab
             </Button>
             <Button
+              leftIcon={<Icon as={FiExternalLink} />}
+              variant="ghost"
+              colorScheme="gray"
+              onClick={handleOpenAtsNewTab}
+              isDisabled={!atsPdfUrl}
+            >
+              Open ATS in new tab
+            </Button>
+            <Button
               leftIcon={<Icon as={FiDownload} />}
               colorScheme="brand"
               variant="outline"
@@ -373,6 +406,15 @@ export default function App() {
               isDisabled={!pdfUrl}
             >
               Download
+            </Button>
+            <Button
+              leftIcon={<Icon as={FiDownload} />}
+              colorScheme="gray"
+              variant="outline"
+              onClick={handleDownloadAts}
+              isDisabled={!atsPdfUrl}
+            >
+              Download ATS
             </Button>
           </HStack>
         </Box>

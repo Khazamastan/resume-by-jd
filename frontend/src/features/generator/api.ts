@@ -21,6 +21,7 @@ export interface GenerateResumeParams {
   sampleProfile?: string;
   accentColor?: string;
   primaryColor?: string;
+  atsFontFamily?: string;
 }
 
 export async function generateResume({
@@ -31,6 +32,7 @@ export async function generateResume({
   sampleProfile,
   accentColor,
   primaryColor,
+  atsFontFamily,
 }: GenerateResumeParams = {}): Promise<ResumeDocumentPayload> {
   const formData = new FormData();
   if (reference) {
@@ -60,6 +62,10 @@ export async function generateResume({
     formData.append('primary_color', primaryColor);
   }
 
+  if (atsFontFamily) {
+    formData.append('ats_font_family', atsFontFamily);
+  }
+
   const { data } = await api.post<ResumeDocumentPayload>('/api/generate', formData);
   return data;
 }
@@ -78,7 +84,12 @@ export async function updateResume(
 }
 
 const DEFAULT_DOWNLOAD_NAME = 'Khajamastan-Bellamkonda.pdf';
+const DEFAULT_ATS_DOWNLOAD_NAME = 'Khajamastan-Bellamkonda-ATS.pdf';
 
 export function buildDownloadName(_profileName?: string) {
   return DEFAULT_DOWNLOAD_NAME;
+}
+
+export function buildAtsDownloadName(_profileName?: string) {
+  return DEFAULT_ATS_DOWNLOAD_NAME;
 }

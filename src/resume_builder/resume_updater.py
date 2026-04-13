@@ -99,13 +99,27 @@ def _format_experience_entry(item: dict) -> Dict[str, object]:
 def _group_skills(skills: List) -> Dict[str, List[str]]:
     grouped: Dict[str, List[str]] = OrderedDict()
     additional: List[str] = []
+
+    def _normalize_category(value: str) -> str:
+        cleaned = _sanitize_text(value).strip().replace("_", " ")
+        token = re.sub(r"[^a-z0-9]+", " ", cleaned.lower()).strip()
+        if token in {"frontend", "front end"}:
+            return "Frontend"
+        if token in {"backend", "back end"}:
+            return "Backend"
+        if token in {"testing profiling", "testing and profiling", "testing devops", "testing and devops"}:
+            return "Testing & DevOps"
+        if token in {"ai devops", "ai and devops", "ai tools"}:
+            return "AI Tools"
+        return cleaned.title() if cleaned else "Other"
+
     for skill in skills:
         normalized = _normalize_skill(skill)
         if not normalized:
             continue
         if ":" in normalized:
             category, values = normalized.split(":", 1)
-            category = category.strip().title() or "Other"
+            category = _normalize_category(category)
             items = [value.strip() for value in values.split(",") if value.strip()]
             if not items:
                 continue
@@ -269,6 +283,104 @@ def _build_section(title: str, items: List[str], bullets: bool = True) -> Resume
         else:
             section.paragraphs.append(cleaned)
     return section
+
+
+_SECTION_STYLE_MATCHERS: "OrderedDict[str, List[str]]" = OrderedDict(
+    [
+        ("summary", ["summary", "profile", "objective", "about"]),
+        ("technical skills", ["skills", "technical skills", "core competencies", "competencies", "expertise"]),
+        ("professional experience", ["professional experience", "experience", "employment", "work history"]),
+        ("education", ["education", "academic", "academics"]),
+        ("projects", ["projects", "project"]),
+        ("certifications", ["certifications", "certification", "licenses"]),
+        ("awards", ["awards", "achievements", "honors"]),
+    ]
+)
+
+
+def _title_key(title: str) -> str:
+    normalized = _sanitize_text(title or "").lower()
+    normalized = re.sub(r"[^a-z0-9]+", " ", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _section_bucket(title: str) -> str:
+    key = _title_key(title)
+    for bucket, aliases in _SECTION_STYLE_MATCHERS.items():
+        for alias in aliases:
+            if alias in key:
+                return bucket
+    return key
+
+
+def _extract_reference_style(section: ResumeSection) -> Dict[str, object] | None:
+    if not isinstance(section.meta, dict):
+        return None
+    raw = section.meta.get("_reference_style")
+    if not isinstance(raw, dict):
+        return None
+    cleaned: Dict[str, object] = {}
+    for key in ("heading_font", "heading_weight", "heading_color", "body_font", "body_weight", "body_color"):
+        value = raw.get(key)
+        if value is None:
+            continue
+        text = _sanitize_text(value).strip()
+        if text:
+            cleaned[key] = text
+    return cleaned or None
+
+
+def _font_weight_hint(font_name: str) -> str:
+    token = _sanitize_text(font_name).lower()
+    if any(part in token for part in ("black", "heavy", "extrabold", "ultrabold", "semibold", "demi", "bold")):
+        return "bold"
+    if "medium" in token:
+        return "medium"
+    if any(part in token for part in ("light", "thin", "book")):
+        return "light"
+    return "regular"
+
+
+def _fallback_reference_style(theme: Theme) -> Dict[str, object]:
+    heading_font = _sanitize_text(theme.heading_font or theme.body_font).strip() or "Helvetica-Bold"
+    body_font = _sanitize_text(theme.body_font).strip() or "Helvetica"
+    body_color = _sanitize_text(theme.primary_color or theme.accent_color).strip() or "#111111"
+    heading_color = _sanitize_text(theme.primary_color or theme.accent_color).strip() or body_color
+    return {
+        "heading_font": heading_font,
+        "heading_weight": _font_weight_hint(heading_font),
+        "heading_color": heading_color,
+        "body_font": body_font,
+        "body_weight": _font_weight_hint(body_font),
+        "body_color": body_color,
+    }
+
+
+def _apply_reference_section_styles(
+    sections: List[ResumeSection],
+    reference_sections: List[ResumeSection],
+    reference_theme: Theme,
+) -> None:
+    by_exact_title: Dict[str, Dict[str, object]] = {}
+    by_bucket: Dict[str, Dict[str, object]] = {}
+    for ref_section in reference_sections:
+        style = _extract_reference_style(ref_section)
+        if not style:
+            continue
+        exact_key = _title_key(ref_section.title)
+        if exact_key and exact_key not in by_exact_title:
+            by_exact_title[exact_key] = dict(style)
+        bucket_key = _section_bucket(ref_section.title)
+        if bucket_key and bucket_key not in by_bucket:
+            by_bucket[bucket_key] = dict(style)
+
+    for section in sections:
+        style = by_exact_title.get(_title_key(section.title)) or by_bucket.get(_section_bucket(section.title))
+        if not style:
+            style = _fallback_reference_style(reference_theme)
+        if not style:
+            continue
+        section.meta.setdefault("_reference_style", dict(style))
 
 
 def _sanitize_profile(profile: ResumeProfile) -> None:
@@ -498,7 +610,11 @@ def build_resume_document(
 
     # Skills section
     skills_section = ResumeSection(title="Technical Skills")
-    skill_categories = _build_skill_categories(profile, insights)
+    has_explicit_categories = any(key.lower() != "additional skills" for key in grouped_skills)
+    if has_explicit_categories:
+        skill_categories = OrderedDict(grouped_skills)
+    else:
+        skill_categories = _build_skill_categories(profile, insights)
     technical_skill_terms: List[str] = []
     if skill_categories:
         skills_section.meta["category_lines"] = [(category, values) for category, values in skill_categories.items()]
@@ -630,6 +746,8 @@ def build_resume_document(
         elif section.bullets and "highlight_terms" not in section.meta:
             section.meta["highlight_terms"] = list(highlight_terms)
     sections.extend(additional_sections)
+
+    _apply_reference_section_styles(sections, reference.sections, reference.theme)
 
     for section in sections:
         _sanitize_section_content(section)

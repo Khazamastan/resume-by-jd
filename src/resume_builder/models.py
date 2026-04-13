@@ -22,6 +22,7 @@ class Theme:
     page_width: float = 595.0
     page_height: float = 842.0
     template: str = "standard"
+    ats_font_family: str = "Calibri"
 
 
 @dataclass
