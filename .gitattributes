@@ -1,0 +1,10 @@
+*.pdf -text -diff -merge
+*.png -text -diff -merge
+*.jpg -text -diff -merge
+*.jpeg -text -diff -merge
+*.svg -text -diff -merge
+
+*.ttf -text -diff -merge -delta
+*.otf -text -diff -merge -delta
+*.ttf.gz -text -diff -merge -delta
+*.otf.gz -text -diff -merge -delta
