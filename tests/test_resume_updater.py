@@ -42,7 +42,7 @@ def test_experience_section_uses_additional_fallback_when_profile_missing():
     reference = ReferenceStructure(theme=theme, sections=[ResumeSection(title="Professional Experience")])
     additional = ResumeSection(
         title="Professional Experience",
-        paragraphs=["Senior Engineer @ Example Corp — Jan 2020 – Present"],
+        paragraphs=["Senior Engineer @ Example Corp | Remote | Jan 2020 – Present"],
         bullets=["Led cross-functional team", "Delivered features on time"],
     )
     profile = ResumeProfile(name="Alex Taylor", additional_sections=[additional])
@@ -56,6 +56,10 @@ def test_experience_section_uses_additional_fallback_when_profile_missing():
     experience_section = next(section for section in document.sections if section.title == "Professional Experience")
     entries = experience_section.meta.get("entries") or []
     assert entries, "Fallback entries should populate experience meta"
+    assert entries[0]["role"] == "Senior Engineer"
+    assert entries[0]["company"] == "Example Corp"
+    assert entries[0]["location"] == "Remote"
+    assert entries[0]["date_range"] == "Jan 2020 - Present"
     assert entries[0]["bullets"] == ["Led cross-functional team", "Delivered features on time"]
 
 
@@ -172,3 +176,22 @@ def test_build_resume_document_uses_explicit_skill_categories_from_profile_schem
     assert "Backend" in categories
     assert "Testing & DevOps" in categories
     assert "AI Tools" in categories
+
+
+def test_build_resume_document_prefers_profile_summary_over_default_template():
+    reference = ReferenceStructure(theme=Theme(), sections=[ResumeSection(title="Summary")])
+    profile = ResumeProfile(
+        name="Ammu",
+        summary=[
+            "First custom summary line.",
+            "Second custom summary line.",
+        ],
+    )
+
+    document = build_resume_document(reference, profile, SkillInsights())
+    summary_section = next(section for section in document.sections if section.title == "Summary")
+
+    assert summary_section.paragraphs == [
+        "First custom summary line.",
+        "Second custom summary line.",
+    ]

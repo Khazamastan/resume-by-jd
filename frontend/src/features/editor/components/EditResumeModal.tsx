@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  ButtonGroup,
   Flex,
   FormControl,
   FormLabel,
@@ -36,7 +37,7 @@ import {
   type UseFormRegister,
   type UseFormWatch,
 } from 'react-hook-form';
-import { FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiDownload, FiExternalLink, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import {
   mapFormToSections,
@@ -46,6 +47,7 @@ import {
   ResumeEditorFormValues,
   SectionKind,
 } from '@/features/editor/types/formTypes';
+import { buildAtsDownloadName, buildDownloadName } from '@/features/generator/api';
 import type { ResumeDocumentPayload, ResumeProfile, ResumeSection } from '@/features/shared/types';
 import { usePdfUrl } from '@/features/shared/usePdfUrl';
 
@@ -101,6 +103,43 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
   }, [session, reset]);
 
   const pdfUrl = usePdfUrl(session?.pdf ?? null);
+  const atsPdfUrl = usePdfUrl(session?.ats_pdf ?? null);
+  const downloadName = buildDownloadName(session?.profile?.name);
+  const atsDownloadName = buildAtsDownloadName(session?.profile?.name);
+
+  const handleOpenNewTab = () => {
+    if (!pdfUrl) {
+      return;
+    }
+    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleOpenAtsNewTab = () => {
+    if (!atsPdfUrl) {
+      return;
+    }
+    window.open(atsPdfUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleDownload = () => {
+    if (!pdfUrl) {
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = pdfUrl;
+    anchor.download = downloadName;
+    anchor.click();
+  };
+
+  const handleDownloadAts = () => {
+    if (!atsPdfUrl) {
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = atsPdfUrl;
+    anchor.download = atsDownloadName;
+    anchor.click();
+  };
 
   const submit = handleSubmit(async (values) => {
     if (!session) {
@@ -277,7 +316,7 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
                         Notice Note
                       </FormLabel>
                       <Textarea
-                        placeholder="Serving Notice Period – Available to Join: May 5, 2026"
+                        placeholder="Serving Notice Period – Available to Join: Immediately"
                         {...register('header.noticeNote')}
                         bg="surface.card"
                         borderColor="border.muted"
@@ -330,20 +369,67 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
           </Grid>
         </ModalBody>
         <ModalFooter borderTopWidth="1px" borderColor="border.muted" bg="surface.card">
-          <HStack w="full" justify="flex-end" spacing={2}>
-            <Button variant="ghost" colorScheme="gray" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="resume-editor-form"
-              colorScheme="brand"
-              isLoading={isUpdating}
-              isDisabled={!isDirty && !isUpdating}
-            >
-              Save &amp; Refresh
-            </Button>
-          </HStack>
+          <Flex
+            w="full"
+            justify="space-between"
+            align={{ base: 'stretch', md: 'center' }}
+            direction={{ base: 'column', md: 'row' }}
+            gap={2}
+          >
+            <ButtonGroup spacing={2} flexWrap="wrap">
+              <Button
+                variant="outline"
+                colorScheme="gray"
+                leftIcon={<Icon as={FiExternalLink} />}
+                onClick={handleOpenNewTab}
+                isDisabled={!pdfUrl}
+              >
+                Open in new tab
+              </Button>
+              <Button
+                variant="outline"
+                colorScheme="gray"
+                leftIcon={<Icon as={FiExternalLink} />}
+                onClick={handleOpenAtsNewTab}
+                isDisabled={!atsPdfUrl}
+              >
+                Open ATS in new tab
+              </Button>
+              <Button
+                variant="outline"
+                colorScheme="brand"
+                leftIcon={<Icon as={FiDownload} />}
+                onClick={handleDownload}
+                isDisabled={!pdfUrl}
+              >
+                Download
+              </Button>
+              <Button
+                variant="outline"
+                colorScheme="brand"
+                leftIcon={<Icon as={FiDownload} />}
+                onClick={handleDownloadAts}
+                isDisabled={!atsPdfUrl}
+              >
+                Download ATS
+              </Button>
+            </ButtonGroup>
+
+            <HStack justify="flex-end" spacing={2}>
+              <Button variant="ghost" colorScheme="gray" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                form="resume-editor-form"
+                colorScheme="brand"
+                isLoading={isUpdating}
+                isDisabled={!isDirty && !isUpdating}
+              >
+                Save &amp; Refresh
+              </Button>
+            </HStack>
+          </Flex>
         </ModalFooter>
       </ModalContent>
     </Modal>

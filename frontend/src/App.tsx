@@ -19,7 +19,7 @@ import {
   VStack,
 } from '@chakra-ui/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FiArrowRight, FiDownload, FiExternalLink, FiRefreshCcw } from 'react-icons/fi';
+import { FiDownload, FiExternalLink, FiPenTool, FiRefreshCcw } from 'react-icons/fi';
 
 import { EditResumeModal } from '@/features/editor/components/EditResumeModal';
 import {
@@ -70,12 +70,12 @@ function AppHeader({ hasSession, onEdit, onReset }: AppHeaderProps) {
       <ButtonGroup spacing={2} variant="outline">
         {hasSession && onEdit && (
           <Button
-            leftIcon={<Icon as={FiArrowRight} />}
+            leftIcon={<Icon as={FiPenTool} />}
             colorScheme="brand"
             variant="solid"
             onClick={onEdit}
           >
-            Open Editor
+            Edit Resume
           </Button>
         )}
         {hasSession && onReset && (
@@ -199,8 +199,8 @@ function SessionSummary({ profileName, headline, sections, onEdit, onReset, isBu
       )}
 
       <ButtonGroup spacing={2} flexWrap="wrap">
-        <Button leftIcon={<Icon as={FiArrowRight} />} colorScheme="brand" onClick={onEdit} isDisabled={isBusy}>
-          Open Editor
+        <Button leftIcon={<Icon as={FiPenTool} />} colorScheme="brand" onClick={onEdit} isDisabled={isBusy}>
+          Edit Resume
         </Button>
         <Button
           leftIcon={<Icon as={FiRefreshCcw} />}
@@ -370,53 +370,67 @@ export default function App() {
         zIndex={20}
       >
         <Box w="full" px={{ base: 4, md: 6 }} py={2}>
-          <HStack spacing={2} justify="flex-end" flexWrap="wrap">
-            <Button
-              type="submit"
-              form={generatorFormId}
-              colorScheme="brand"
-              isLoading={isGenerateButtonLoading}
-              isDisabled={isUpdating || isGenerateButtonLoading}
-            >
-              Generate
-            </Button>
-            <Button
-              leftIcon={<Icon as={FiExternalLink} />}
-              variant="ghost"
-              colorScheme="gray"
-              onClick={handleOpenNewTab}
-              isDisabled={!pdfUrl}
-            >
-              Open in new tab
-            </Button>
-            <Button
-              leftIcon={<Icon as={FiExternalLink} />}
-              variant="ghost"
-              colorScheme="gray"
-              onClick={handleOpenAtsNewTab}
-              isDisabled={!atsPdfUrl}
-            >
-              Open ATS in new tab
-            </Button>
-            <Button
-              leftIcon={<Icon as={FiDownload} />}
-              colorScheme="brand"
-              variant="outline"
-              onClick={handleDownload}
-              isDisabled={!pdfUrl}
-            >
-              Download
-            </Button>
-            <Button
-              leftIcon={<Icon as={FiDownload} />}
-              colorScheme="gray"
-              variant="outline"
-              onClick={handleDownloadAts}
-              isDisabled={!atsPdfUrl}
-            >
-              Download ATS
-            </Button>
-          </HStack>
+          <Flex justify="space-between" align="center" wrap="wrap" gap={2}>
+            <HStack spacing={2} wrap="wrap">
+              <Button
+                leftIcon={<Icon as={FiExternalLink} />}
+                variant="ghost"
+                colorScheme="gray"
+                onClick={handleOpenNewTab}
+                isDisabled={!pdfUrl}
+              >
+                Open in new tab
+              </Button>
+              <Button
+                leftIcon={<Icon as={FiExternalLink} />}
+                variant="ghost"
+                colorScheme="gray"
+                onClick={handleOpenAtsNewTab}
+                isDisabled={!atsPdfUrl}
+              >
+                Open ATS in new tab
+              </Button>
+              <Button
+                leftIcon={<Icon as={FiDownload} />}
+                colorScheme="brand"
+                variant="outline"
+                onClick={handleDownload}
+                isDisabled={!pdfUrl}
+              >
+                Download
+              </Button>
+              <Button
+                leftIcon={<Icon as={FiDownload} />}
+                colorScheme="brand"
+                variant="outline"
+                onClick={handleDownloadAts}
+                isDisabled={!atsPdfUrl}
+              >
+                Download ATS
+              </Button>
+            </HStack>
+
+            <HStack spacing={2} wrap="wrap" justify={{ base: 'flex-start', md: 'flex-end' }}>
+              <Button
+                leftIcon={<Icon as={FiPenTool} />}
+                variant="outline"
+                colorScheme="brand"
+                onClick={onOpen}
+                isDisabled={!hasSession || isGenerating || isUpdating}
+              >
+                Edit Resume
+              </Button>
+              <Button
+                type="submit"
+                form={generatorFormId}
+                colorScheme="brand"
+                isLoading={isGenerateButtonLoading}
+                isDisabled={isUpdating || isGenerateButtonLoading}
+              >
+                Generate
+              </Button>
+            </HStack>
+          </Flex>
         </Box>
       </Box>
       <EditResumeModal isOpen={isOpen} onClose={onClose} session={session} onUpdated={update} isUpdating={isUpdating} />

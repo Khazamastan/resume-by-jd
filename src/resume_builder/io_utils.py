@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from collections import OrderedDict
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -68,6 +69,41 @@ def _normalize_profile_skills(raw_skills: Any) -> List[str]:
     return normalized
 
 
+def _normalize_availability_join_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        value = value.date()
+    if isinstance(value, date):
+        return f"{value.strftime('%B')} {value.day}, {value.year}"
+
+    text = str(value).strip()
+    if not text:
+        return ""
+
+    iso_match = re.fullmatch(r"\d{4}-\d{2}-\d{2}", text)
+    if iso_match:
+        try:
+            parsed = datetime.strptime(text, "%Y-%m-%d").date()
+        except ValueError:
+            return text
+        return f"{parsed.strftime('%B')} {parsed.day}, {parsed.year}"
+    return text
+
+
+def _notice_note_from_availability(raw_availability: Any) -> str:
+    if not isinstance(raw_availability, dict):
+        return ""
+    status = str(raw_availability.get("status") or "").strip()
+    available_to_join = _normalize_availability_join_text(raw_availability.get("available_to_join"))
+
+    if status and available_to_join:
+        return f"{status} – Available to Join: {available_to_join}"
+    if available_to_join:
+        return f"Available to Join: {available_to_join}"
+    return status
+
+
 def load_profile(profile_path: str | Path) -> ResumeProfile:
     """Load structured resume profile data from YAML or JSON."""
     path = _ensure_path(Path(profile_path))
@@ -91,10 +127,25 @@ def load_profile(profile_path: str | Path) -> ResumeProfile:
     if not name:
         raise ValueError("Profile data must include a 'name' field.")
 
+    raw_contact = data.get("contact") or {}
+    contact: Dict[str, str] = {}
+    if isinstance(raw_contact, dict):
+        for key, value in raw_contact.items():
+            key_text = str(key).strip()
+            value_text = str(value or "").strip()
+            if key_text and value_text:
+                contact[key_text] = value_text
+
+    has_notice_note = any(contact.get(key) for key in ("notice_note", "noticeNote", "notice"))
+    if not has_notice_note:
+        availability_note = _notice_note_from_availability(data.get("availability"))
+        if availability_note:
+            contact["notice_note"] = availability_note
+
     resume = ResumeProfile(
         name=name,
         headline=data.get("headline"),
-        contact=data.get("contact", {}),
+        contact=contact,
         summary=data.get("summary", []) or [],
         experience=data.get("experience", []) or [],
         education=data.get("education", []) or [],

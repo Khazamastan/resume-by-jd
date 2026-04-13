@@ -5,6 +5,7 @@ import {
   Button,
   ButtonGroup,
   Center,
+  Flex,
   Heading,
   HStack,
   Icon,
@@ -76,7 +77,7 @@ export function ResumePreview({
         {onEdit && (
           <ButtonGroup>
             <Button leftIcon={<Icon as={FiPenTool} />} variant="outline" colorScheme="brand" onClick={onEdit}>
-              Open Editor
+              Edit Resume
             </Button>
           </ButtonGroup>
         )}
@@ -119,9 +120,16 @@ export function ResumePreview({
           </>
         </AspectRatio>
         {showLoader && (
-          <Center position="absolute" inset={0} bg="rgba(255,255,255,0.7)" backdropFilter="blur(2px)">
-            <Spinner size="xl" color="brand.500" thickness="4px" transform={{ base: 'translateY(-12px)', md: 'translateY(-18px)' }} />
-          </Center>
+          <Flex position="absolute" inset={0} bg="rgba(255,255,255,0.7)" backdropFilter="blur(2px)">
+            <Spinner
+              position="absolute"
+              top={{ base: 3, md: 4 }}
+              left={{ base: 3, md: 4 }}
+              size="xl"
+              color="brand.500"
+              thickness="4px"
+            />
+          </Flex>
         )}
       </Box>
     </Stack>

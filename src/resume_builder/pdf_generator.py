@@ -1519,7 +1519,9 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
         ats_content_font = ats_body_font
     body_size = max(9.0, min(float(theme.body_size or 10.0) + 1.0, 12.0))
     heading_size = max(body_size + 2.2, 12.5)
-    name_size = max(19.0, heading_size + 5.0)
+    name_size = max(17.8, heading_size + 3.8)
+    headline_size = max(9.8, heading_size - 0.8)
+    section_heading_size = max(10.6, heading_size - 1.0)
     accent_hex = _plain_text(theme.accent_color or theme.primary_color or "#111827")
     if accent_hex and not accent_hex.startswith("#"):
         accent_hex = f"#{accent_hex}"
@@ -1528,10 +1530,11 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
     if not _is_dark_color(accent_hex):
         accent_hex = _mix_hex(accent_hex, "#111827", 0.58)
     section_color = _color_from_hex(accent_hex, colors.HexColor("#1f2937"))
-    muted_color = _color_from_hex(_mix_hex(accent_hex, "#ffffff", 0.36), colors.HexColor("#4a596b"))
-    contact_color = _color_from_hex(_mix_hex(accent_hex, "#ffffff", 0.38), colors.HexColor("#5f6f81"))
+    headline_color = _color_from_hex(_mix_hex(accent_hex, "#111827", 0.72), colors.HexColor("#1f2937"))
+    body_color = _color_from_hex(_mix_hex(accent_hex, "#111827", 0.84), colors.HexColor("#374b60"))
+    muted_color = _color_from_hex(_mix_hex(accent_hex, "#ffffff", 0.42), colors.HexColor("#4a596b"))
+    contact_color = _color_from_hex(_mix_hex(accent_hex, "#111827", 0.70), colors.HexColor("#4f5d6f"))
     rule_color = _color_from_hex(_mix_hex(accent_hex, "#ffffff", 0.76), colors.HexColor("#d1d5db"))
-    body_color = colors.HexColor("#374b60")
 
     styles.add(
         ParagraphStyle(
@@ -1582,9 +1585,9 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
             "ATSHeadline",
             parent=styles["ATSBody"],
             fontName=ats_medium_font,
-            fontSize=max(10.5, heading_size - 0.2),
-            leading=max(10.5, heading_size - 0.2) * 1.2,
-            textColor=colors.HexColor("#1f2937"),
+            fontSize=headline_size,
+            leading=headline_size * 1.2,
+            textColor=headline_color,
             spaceAfter=4,
         )
     )
@@ -1603,8 +1606,8 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
             "ATSSection",
             parent=styles["ATSBody"],
             fontName=ats_bold_font,
-            fontSize=max(11.0, heading_size - 0.3),
-            leading=max(11.0, heading_size - 0.3) * 1.15,
+            fontSize=section_heading_size,
+            leading=section_heading_size * 1.12,
             textColor=section_color,
             spaceBefore=9,
             spaceAfter=3.2,
@@ -1687,14 +1690,18 @@ def _ats_section_style_overrides(
     if not isinstance(raw_style, dict):
         return default_title, default_body, default_experience_header, default_meta, default_bullet
 
-    heading_hex = _normalize_hex_for_ats(raw_style.get("heading_color"))
-    body_hex = _normalize_hex_for_ats(raw_style.get("body_color"))
+    # Keep ATS palette consistent with the selected/global accent.
+    # Reference section colors can force stale hues (for example blue) across samples.
+    heading_color = default_title.textColor
+    body_color = default_body.textColor
 
-    heading_color = _color_from_hex(heading_hex or "", default_title.textColor)
-    adjusted_body_hex = _mix_hex(body_hex, "#ffffff", 0.08) if body_hex else ""
-    body_color = _color_from_hex(adjusted_body_hex, default_body.textColor)
-
-    title_font = _ats_weight_to_font(raw_style.get("heading_weight"), styles, default_title.fontName)
+    section_title = _plain_text(section.title).lower()
+    force_standard_heading_font = section_title in {"summary", "professional summary", "skills", "technical skills"}
+    title_font = (
+        default_title.fontName
+        if force_standard_heading_font
+        else _ats_weight_to_font(raw_style.get("heading_weight"), styles, default_title.fontName)
+    )
     body_font = _ats_weight_to_font(raw_style.get("body_weight"), styles, default_body.fontName)
 
     title_style = ParagraphStyle(
@@ -1773,6 +1780,18 @@ def _normalize_ats_parser_text(value: object) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _normalize_ats_education_text(value: object) -> str:
+    text = _normalize_ats_parser_text(value)
+    if not text:
+        return ""
+    return re.sub(
+        r"\bB\.?\s*Tech\b",
+        "Bachelors Degree (B.Tech)",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+
 def _ats_contact_lines(document: ResumeDocument) -> List[str]:
     contact = document.profile.contact or {}
     if not contact:
@@ -1780,9 +1799,9 @@ def _ats_contact_lines(document: ResumeDocument) -> List[str]:
 
     preferred_keys = ("phone", "email", "location", "linkedin", "github", "portfolio", "website")
     label_map = {
-        "phone": "Phone",
+        "phone": "Mobile",
         "email": "Email",
-        "location": "Location",
+        "location": "Address",
         "linkedin": "LinkedIn",
         "github": "GitHub",
         "portfolio": "Portfolio",
@@ -1920,17 +1939,24 @@ def _append_ats_bullets(
     styles: StyleSheet1,
     bullet_style: ParagraphStyle | None = None,
     highlight_terms: List[str] | None = None,
+    line_gap: float = 0.0,
 ) -> None:
     active_bullet_style = bullet_style or styles["ATSBullet"]
     terms = highlight_terms or []
+    cleaned_bullets: List[str] = []
     for bullet in bullets:
         cleaned = _clean_bullet_text(_plain_text(bullet))
         if not cleaned:
             continue
+        cleaned_bullets.append(cleaned)
+    total_bullets = len(cleaned_bullets)
+    for idx, cleaned in enumerate(cleaned_bullets):
         highlighted = _format_highlighted_text(cleaned, terms)
         bold_font = _ats_weight_to_font("bold", styles, active_bullet_style.fontName)
         highlighted = highlighted.replace("<b>", f'<font face="{bold_font}">').replace("</b>", "</font>")
         flowables.append(Paragraph(highlighted, active_bullet_style, bulletText="-"))
+        if line_gap > 0 and idx < total_bullets - 1:
+            flowables.append(Spacer(1, line_gap))
 
 
 def _ats_section_elements(document: ResumeDocument, section: ResumeSection, styles: StyleSheet1) -> List:
@@ -1954,6 +1980,41 @@ def _ats_section_elements(document: ResumeDocument, section: ResumeSection, styl
     flowables.append(Spacer(1, 5.5))
 
     title_lower = title.lower()
+    is_summary_section = title_lower in {"summary", "professional summary"}
+    # Add subtle line-height breathing room for selected content-heavy sections.
+    if title_lower in {"summary", "professional summary", "skills", "technical skills", "awards"} or _is_experience_section_title(title_lower):
+        body_leading = float(getattr(body_style, "leading", getattr(body_style, "fontSize", 10.0) * 1.2))
+        bullet_leading = float(getattr(bullet_style, "leading", getattr(bullet_style, "fontSize", 10.0) * 1.2))
+        header_leading = float(
+            getattr(experience_header_style, "leading", getattr(experience_header_style, "fontSize", 10.0) * 1.2)
+        )
+        meta_leading = float(getattr(meta_style, "leading", getattr(meta_style, "fontSize", 10.0) * 1.2))
+        body_leading_delta = 0.0 if is_summary_section else 1.2
+        bullet_leading_delta = 0.0 if is_summary_section else 1.2
+
+        body_style = ParagraphStyle(
+            "ATSSectionContentLineGapBody",
+            parent=body_style,
+            leading=body_leading + body_leading_delta,
+            spaceAfter=0.8 if is_summary_section else getattr(body_style, "spaceAfter", 2.2),
+        )
+        bullet_style = ParagraphStyle(
+            "ATSSectionContentLineGapBullet",
+            parent=bullet_style,
+            leading=bullet_leading + bullet_leading_delta,
+            spaceAfter=1.2 if is_summary_section else getattr(bullet_style, "spaceAfter", 4.0),
+        )
+        experience_header_style = ParagraphStyle(
+            "ATSSectionContentLineGapHeader",
+            parent=experience_header_style,
+            leading=header_leading + 1.0,
+        )
+        meta_style = ParagraphStyle(
+            "ATSSectionContentLineGapMeta",
+            parent=meta_style,
+            leading=meta_leading + 1.0,
+        )
+
     if _is_experience_section_title(title_lower):
         entries = _collect_ats_experience_entries(document, section)
         total_entries = len(entries)
@@ -1963,7 +2024,7 @@ def _ats_section_elements(document: ResumeDocument, section: ResumeSection, styl
             company_value = _normalize_ats_parser_text(entry.get("company"))
             header_parts: List[str] = []
             if role_value:
-                header_parts.append(f"Role: {role_value}")
+                header_parts.append(role_value)
             if company_value:
                 header_parts.append(f"Company: {company_value}")
             header_line = " | ".join(header_parts)
@@ -1979,24 +2040,35 @@ def _ats_section_elements(document: ResumeDocument, section: ResumeSection, styl
                 meta_parts.append(f"Timeline: {timeline_value}")
             meta_line = " | ".join(meta_parts)
             if meta_line:
+                if header_line:
+                    entry_flow.append(Spacer(1, 1.0))
                 entry_flow.append(Paragraph(_escape_text(meta_line), meta_style))
             bullet_items = list(entry.get("bullets", []) or [])
             if bullet_items:
                 entry_flow.append(Spacer(1, 1.8))
-            _append_ats_bullets(entry_flow, bullet_items, styles, bullet_style, highlight_terms)
+            _append_ats_bullets(entry_flow, bullet_items, styles, bullet_style, highlight_terms, line_gap=1.5)
             if entry_flow:
-                flowables.append(KeepTogether(entry_flow))
+                # Keep the first entry splittable so the section heading is not orphaned.
+                # This avoids visible blank space when the first block doesn't fully fit.
+                if idx == 0:
+                    flowables.extend(entry_flow)
+                else:
+                    flowables.append(KeepTogether(entry_flow))
             if idx < total_entries - 1:
                 flowables.append(Spacer(1, 2))
                 flowables.append(HRFlowable(width="100%", thickness=0.25, color=rule_color))
-            flowables.append(Spacer(1, 4))
+            flowables.append(Spacer(1, 5))
 
         if not entries:
-            for paragraph in section.paragraphs:
-                cleaned = _plain_text(paragraph)
+            cleaned_paragraphs = [_plain_text(paragraph) for paragraph in section.paragraphs]
+            cleaned_paragraphs = [value for value in cleaned_paragraphs if value]
+            total_paragraphs = len(cleaned_paragraphs)
+            for idx, cleaned in enumerate(cleaned_paragraphs):
                 if cleaned:
                     flowables.append(Paragraph(_escape_text(cleaned), body_style))
-            _append_ats_bullets(flowables, section.bullets, styles, bullet_style, highlight_terms)
+                    if idx < total_paragraphs - 1:
+                        flowables.append(Spacer(1, 2))
+            _append_ats_bullets(flowables, section.bullets, styles, bullet_style, highlight_terms, line_gap=1.5)
             flowables.append(Spacer(1, 5))
         return flowables
 
@@ -2023,40 +2095,58 @@ def _ats_section_elements(document: ResumeDocument, section: ResumeSection, styl
                 skill_lines.append(f"{category}: {', '.join(items)}")
 
         if skill_lines:
-            for line in skill_lines:
+            total_skill_lines = len(skill_lines)
+            for idx, line in enumerate(skill_lines):
                 if ":" in line:
                     category, values = line.split(":", 1)
                     category_clean = _plain_text(category)
                     category_lower = category_clean.lower()
                     highlight_hex = getattr(styles, "_ats_emphasis_hex", "#1f2937")
+                    base_category_markup = (
+                        f'<font face="{skills_label_bold_font}">{_escape_text(category_clean)}:</font>'
+                    )
                     if category_lower in ATS_SKILL_LABEL_HIGHLIGHT:
-                        category_markup = (
-                            f'<font color="{highlight_hex}"><font face="{skills_label_bold_font}">{_escape_text(category_clean)}:</font></font>'
-                        )
+                        category_markup = f'<font color="{highlight_hex}">{base_category_markup}</font>'
                     else:
-                        category_markup = f"{_escape_text(category_clean)}:"
+                        category_markup = base_category_markup
                     skill_markup = f"{category_markup} {_escape_text(values)}"
                     flowables.append(Paragraph(skill_markup, body_style))
                 else:
                     flowables.append(Paragraph(_escape_text(line), body_style))
+                if idx < total_skill_lines - 1:
+                    flowables.append(Spacer(1, 5))
         else:
             raw_skills = [_plain_text(value) for value in section.bullets if _plain_text(value)]
             if not raw_skills:
                 raw_skills = [_plain_text(value) for value in document.profile.skills if _plain_text(value)]
             if raw_skills:
                 flowables.append(Paragraph(_escape_text(", ".join(raw_skills)), body_style))
-        flowables.append(Spacer(1, 4))
+        flowables.append(Spacer(1, 5))
         return flowables
 
-    for paragraph in section.paragraphs:
-        cleaned = _plain_text(paragraph)
+    apply_extra_line_spacing = title_lower in {"awards"}
+    cleaned_paragraphs = [_plain_text(paragraph) for paragraph in section.paragraphs]
+    cleaned_paragraphs = [value for value in cleaned_paragraphs if value]
+    total_paragraphs = len(cleaned_paragraphs)
+    for idx, cleaned in enumerate(cleaned_paragraphs):
         if not cleaned:
             continue
+        if title_lower == "education":
+            cleaned = _normalize_ats_education_text(cleaned)
         if cleaned.startswith(("•", "■", "-")):
             _append_ats_bullets(flowables, [cleaned], styles, bullet_style, highlight_terms)
         else:
             flowables.append(Paragraph(_escape_text(cleaned), body_style))
-    _append_ats_bullets(flowables, section.bullets, styles, bullet_style, highlight_terms)
+        if apply_extra_line_spacing and idx < total_paragraphs - 1:
+            flowables.append(Spacer(1, 2))
+    _append_ats_bullets(
+        flowables,
+        section.bullets,
+        styles,
+        bullet_style,
+        highlight_terms,
+        line_gap=1.5 if apply_extra_line_spacing else 0.0,
+    )
     flowables.append(Spacer(1, 4))
     return flowables
 
@@ -2067,14 +2157,15 @@ def render_ats_resume(document: ResumeDocument, output_path: str | Path) -> Path
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     theme = document.theme
-    pagesize = (theme.page_width, theme.page_height) if theme.page_width and theme.page_height else A4
+    # ATS output should stay on a fixed, standard page size for consistent parsing.
+    pagesize = A4
     styles = _build_ats_styles(theme)
 
     doc = SimpleDocTemplate(
         str(dest),
         pagesize=pagesize,
-        leftMargin=36,
-        rightMargin=36,
+        leftMargin=24,
+        rightMargin=24,
         topMargin=32,
         bottomMargin=32,
     )

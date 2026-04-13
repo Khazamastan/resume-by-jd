@@ -66,6 +66,29 @@ skills:
     ]
 
 
+def test_load_profile_maps_availability_to_notice_note(tmp_path):
+    profile_path = tmp_path / "profile.yaml"
+    profile_path.write_text(
+        """
+name: Candidate
+headline: Engineer
+contact:
+  email: candidate@example.com
+summary: []
+experience: []
+education: []
+skills: []
+availability:
+  status: Serving Notice Period
+  available_to_join: 2026-05-05
+"""
+    )
+
+    profile = load_profile(profile_path)
+
+    assert profile.contact["notice_note"] == "Serving Notice Period – Available to Join: May 5, 2026"
+
+
 def test_profile_to_canonical_serializes_categorized_skills_mapping():
     profile = ResumeProfile(
         name="Khaja",

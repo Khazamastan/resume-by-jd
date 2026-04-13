@@ -555,17 +555,103 @@ def _build_fallback_experience_entries(section: ResumeSection) -> List[Dict[str,
     entries: List[Dict[str, object]] = []
     current: Dict[str, object] | None = None
     header_pattern = re.compile(r"(@| at | – | — | - | \| |\d{4})", re.IGNORECASE)
+
+    date_token_pattern = re.compile(
+        r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec|present|current|\d{4})\b",
+        re.IGNORECASE,
+    )
+
+    def _normalize_date_range(value: str) -> str:
+        normalized = _sanitize_text(value).strip()
+        normalized = normalized.replace("–", "-").replace("—", "-").replace("−", "-")
+        normalized = re.sub(r"\s*-\s*", " - ", normalized)
+        return re.sub(r"\s+", " ", normalized).strip()
+
+    def _looks_like_date_segment(value: str) -> bool:
+        cleaned = _sanitize_text(value).strip()
+        if not cleaned:
+            return False
+        return bool(date_token_pattern.search(cleaned))
+
+    def _parse_header_fields(value: str) -> Dict[str, str]:
+        line = _sanitize_text(value).strip()
+        parsed = {
+            "role": line,
+            "company": "",
+            "location": "",
+            "date_range": "",
+        }
+        if not line:
+            return parsed
+
+        segments = [segment.strip() for segment in re.split(r"\|", line) if segment.strip()]
+        if not segments:
+            segments = [line]
+
+        first_segment = segments[0]
+        role = first_segment
+        company = ""
+        location = ""
+        date_range = ""
+
+        if "@" in first_segment:
+            role_part, company_part = first_segment.split("@", 1)
+            role = role_part.strip() or role
+            company = company_part.strip()
+        else:
+            at_match = re.split(r"\s+at\s+", first_segment, maxsplit=1, flags=re.IGNORECASE)
+            if len(at_match) == 2:
+                role = at_match[0].strip() or role
+                company = at_match[1].strip()
+
+        remaining_segments = segments[1:]
+        if not remaining_segments and not company:
+            dash_segments = [segment.strip() for segment in re.split(r"\s[-–—]\s", line) if segment.strip()]
+            if len(dash_segments) >= 2:
+                role = dash_segments[0]
+                for segment in dash_segments[1:]:
+                    if not date_range and _looks_like_date_segment(segment):
+                        date_range = _normalize_date_range(segment)
+                        continue
+                    if not company:
+                        company = segment
+                        continue
+                    if not location:
+                        location = segment
+                parsed["role"] = role
+                parsed["company"] = company
+                parsed["location"] = location
+                parsed["date_range"] = date_range
+                return parsed
+
+        for segment in remaining_segments:
+            if not date_range and _looks_like_date_segment(segment):
+                date_range = _normalize_date_range(segment)
+                continue
+            if not location:
+                location = segment
+                continue
+            if not company:
+                company = segment
+
+        parsed["role"] = role
+        parsed["company"] = company
+        parsed["location"] = location
+        parsed["date_range"] = date_range
+        return parsed
+
     for line in lines:
         if current is None or header_pattern.search(line):
             if current:
                 current["bullets"] = [bullet for bullet in current.get("bullets", []) if bullet]
-                if current["role"] or current["bullets"]:
+                if current["role"] or current["company"] or current["date_range"] or current["bullets"]:
                     entries.append(current)
+            parsed = _parse_header_fields(line)
             current = {
-                "role": line.strip(),
-                "company": "",
-                "location": "",
-                "date_range": "",
+                "role": parsed["role"],
+                "company": parsed["company"],
+                "location": parsed["location"],
+                "date_range": parsed["date_range"],
                 "bullets": [],
             }
         else:
@@ -574,7 +660,7 @@ def _build_fallback_experience_entries(section: ResumeSection) -> List[Dict[str,
     if current:
         current.setdefault("bullets", []).extend(bullets)
         current["bullets"] = [bullet for bullet in current.get("bullets", []) if bullet]
-        if current["role"] or current["bullets"]:
+        if current["role"] or current["company"] or current["date_range"] or current["bullets"]:
             entries.append(current)
     elif bullets:
         entries.append(
@@ -600,13 +686,37 @@ def build_resume_document(
     grouped_skills = _group_skills(merged_skills)
 
     # Summary section
-    summary_paragraph = SUMMARY_TEMPLATE
-    summary_terms = _collect_job_summary_terms(insights)
-    if summary_terms:
-        summary_paragraph = (
-            f"{_ensure_sentence(SUMMARY_TEMPLATE)} Key strengths aligned to this role: {', '.join(summary_terms)}."
-        )
-    summary_section = ResumeSection(title="Summary", paragraphs=[_sanitize_text(summary_paragraph)])
+    profile_summary_lines = [
+        _sanitize_text(line).strip()
+        for line in (profile.summary or [])
+        if _sanitize_text(line).strip()
+    ]
+    if profile_summary_lines:
+        summary_paragraphs = profile_summary_lines
+    else:
+        summary_paragraph = SUMMARY_TEMPLATE
+        summary_terms = _collect_job_summary_terms(insights)
+        if summary_terms:
+            summary_paragraph = (
+                f"{_ensure_sentence(SUMMARY_TEMPLATE)} Key strengths aligned to this role: {', '.join(summary_terms)}."
+            )
+        summary_paragraphs = [_sanitize_text(summary_paragraph)]
+    ref_summary_section = next(
+        (
+            section
+            for section in reference.sections
+            if any(keyword in (section.title or "").lower() for keyword in ("summary", "profile", "objective", "about"))
+        ),
+        None,
+    )
+    summary_title = "Summary"
+    if ref_summary_section and ref_summary_section.title:
+        cleaned_summary_title = _sanitize_text(ref_summary_section.title).strip()
+        cleaned_summary_title = re.sub(r"[_\-]{3,}", "", cleaned_summary_title).strip()
+        cleaned_summary_title = re.sub(r"\s+", " ", cleaned_summary_title).strip()
+        if cleaned_summary_title:
+            summary_title = cleaned_summary_title
+    summary_section = ResumeSection(title=summary_title, paragraphs=summary_paragraphs)
 
     # Skills section
     skills_section = ResumeSection(title="Technical Skills")

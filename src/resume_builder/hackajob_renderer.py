@@ -49,7 +49,6 @@ CARD_PAD_TOP = 10
 CARD_PAD_BOTTOM = 10
 CARD_BORDER_WIDTH = 0.75
 DIVIDER_LINE_WIDTH = 0.65
-DEFAULT_NOTICE_PERIOD_NOTE = "Serving Notice Period – Available to Join: May 5, 2026"
 
 HACKAJOB_MEDIUM = "HackajobSpaceGroteskMedium"
 HACKAJOB_BOLD = "HackajobSpaceGroteskBold"
@@ -629,7 +628,7 @@ def _notice_period_note(document: ResumeDocument) -> str:
         or contact.get("noticeNote")
         or contact.get("notice")
     )
-    return note or DEFAULT_NOTICE_PERIOD_NOTE
+    return note
 
 
 def _header_contact_items(document: ResumeDocument) -> List[Tuple[str, str, str]]:

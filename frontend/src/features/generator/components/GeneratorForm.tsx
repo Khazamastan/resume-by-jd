@@ -72,7 +72,7 @@ function fileFromList(list?: FileList | null): File | undefined {
 }
 
 export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-form' }: GeneratorFormProps) {
-  const { accent: currentAccent, setAccent } = useThemeSettings();
+  const { setAccent } = useThemeSettings();
   const [sampleProfiles, setSampleProfiles] = useState<SampleProfileSummary[]>([]);
   const [sampleProfilesError, setSampleProfilesError] = useState<string | null>(null);
   const [isSampleProfilesLoading, setIsSampleProfilesLoading] = useState(true);
@@ -88,7 +88,7 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
     defaultValues: {
       sampleProfile: defaultSampleProfileId,
       jobText: '',
-      accentKey: currentAccent ?? defaultAccent,
+      accentKey: defaultAccent,
       atsFontFamily: 'Calibri',
     },
   });
@@ -137,7 +137,7 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
     const profile = fileFromList(values.profile);
 
     const selectedAccent = values.accentKey ?? defaultAccent;
-    const accentColor = getAccentHex(selectedAccent);
+    const accentColor = selectedAccent === 'reference' ? undefined : getAccentHex(selectedAccent);
 
     await onGenerate({
       reference: reference ?? undefined,

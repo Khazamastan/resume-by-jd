@@ -4,12 +4,9 @@ contact:
   phone: "+91-7660897839"
   email: sknagurbhee@gmail.com
   location: Bangalore, India
-  linkedin: https://www.linkedin.com/in/sknagurbhee
+  linkedin: https://www.linkedin.com/in/nagurbhee
 summary:
-  - Impactful talent acquisition specialist with progressive experience in managing global leadership hiring for niche requirements and in tough markets.
-  - Experienced in recruiting across multiple industries including IT and consulting firms.
-  - Proven track record of high-volume recruitment, having closed over 70 positions with 60+ successful joiners.
-  - Skilled in HR operations, employee engagement, vendor management, and organization development.
+  - Impactful talent acquisition specialist with progressive experience in managing global leadership hiring for niche requirements and in tough markets. Experienced in recruiting across multiple industries including IT and consulting firms. Proven track record of high-volume recruitment, having closed over 70 positions with 60+ successful joiners. Skilled in HR operations, employee engagement, vendor management, and organization development.
 experience:
   - company: Elocity Technologies
     role: Assistant Manager HR & Admin
@@ -50,16 +47,8 @@ education:
     start: 2014-08-01
     end: 2018-08-01
 skills:
-  - HR Operations
-  - IT & Non-Tech Recruitment
-  - Talent Acquisition & Sourcing
-  - Vendor Management
-  - Employee Engagement & Relations
-  - Negotiation Skills
-  - Workday & ATS Portals
-  - Client Handling
-  - Leadership
-  - Problem-solving
+  HR: [HR Operations, IT & Non-Tech Recruitment, Talent Acquisition & Sourcing, Vendor Management, Employee Engagement & Relations, Negotiation Skills, Workday & ATS Portals, Client Handling, Leadership, Problem-solving]
+  Technical_Hiring: [UI Developer, UX, Angular, React, PHP, JAVA, Dot Net, SQL, PLSQL, Data Science, Python, AWS, DevOps,  Data Science, Workday, ATS Portals, LinkedIn Recruiter ]
 additional_sections:
   - title: Awards & Recognition
     bullets:
@@ -68,3 +57,6 @@ additional_sections:
       - Achieved 2nd Position Yearly for Revenue (April 2022 - April 2023).
       - Multiple 2nd Position Monthly and Quarterly awards for revenue generation in 2022.
       - Bicentennial Award – August 2022.
+availability:
+  status: Serving Notice Period
+  available_to_join: Immediately
