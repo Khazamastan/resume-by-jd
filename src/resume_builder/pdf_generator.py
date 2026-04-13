@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import gzip
 import html
 import re
+import shutil
 from collections import OrderedDict
 from functools import lru_cache
+from hashlib import sha1
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Dict, List, Tuple
@@ -640,9 +643,41 @@ def _is_serif_hint(value: str) -> bool:
     return any(keyword in token for keyword in ("garamond", "georgia", "times", "cambria", "serif"))
 
 
+def _inflate_font_if_compressed(path: Path) -> Path | None:
+    compressed_path = path.with_name(f"{path.name}.gz")
+    if not compressed_path.exists():
+        return None
+    cache_dir = Path(gettempdir()) / "resume_by_jd" / "fonts"
+    cache_key = sha1(str(compressed_path).encode("utf-8")).hexdigest()
+    cache_path = cache_dir / f"{cache_key}-{path.name}"
+    try:
+        compressed_stat = compressed_path.stat()
+    except OSError:
+        return None
+    try:
+        if cache_path.exists():
+            cached_stat = cache_path.stat()
+            if cached_stat.st_size > 0 and cached_stat.st_mtime >= compressed_stat.st_mtime:
+                return cache_path
+    except OSError:
+        pass
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        with gzip.open(compressed_path, "rb") as source, cache_path.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
+        if cache_path.exists() and cache_path.stat().st_size > 0:
+            return cache_path
+    except OSError:
+        return None
+    return None
+
+
 def _download_font_if_missing(path: Path) -> Path | None:
     if path.exists():
         return path
+    inflated = _inflate_font_if_compressed(path)
+    if inflated and inflated.exists():
+        return inflated
     urls = ATS_ONLINE_FONT_SOURCES.get(path.name)
     if not urls:
         return None
@@ -663,11 +698,9 @@ def _download_font_if_missing(path: Path) -> Path | None:
 
 def _first_available_font_path(candidates: List[Path]) -> Path | None:
     for candidate in candidates:
-        if candidate.exists():
-            return candidate
-        downloaded = _download_font_if_missing(candidate)
-        if downloaded and downloaded.exists():
-            return downloaded
+        resolved = _download_font_if_missing(candidate)
+        if resolved and resolved.exists():
+            return resolved
     return None
 
 

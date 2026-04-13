@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import gzip
 import html
 import re
+import shutil
 from dataclasses import dataclass
 from datetime import date, datetime
+from hashlib import sha1
 from pathlib import Path
+from tempfile import gettempdir
 from typing import Dict, Iterable, List, Sequence, Tuple
 
 from dateutil import parser as date_parser
@@ -196,9 +200,48 @@ def _build_palette(accent_color: str | None, primary_color: str | None) -> _Hack
     )
 
 
+def _resolve_font_file(path: Path) -> Path | None:
+    if path.exists():
+        return path
+    compressed_path = path.with_name(f"{path.name}.gz")
+    if not compressed_path.exists():
+        return None
+    cache_dir = Path(gettempdir()) / "resume_by_jd" / "fonts"
+    cache_key = sha1(str(compressed_path).encode("utf-8")).hexdigest()
+    cache_path = cache_dir / f"{cache_key}-{path.name}"
+    try:
+        compressed_stat = compressed_path.stat()
+    except OSError:
+        return None
+    try:
+        if cache_path.exists():
+            cached_stat = cache_path.stat()
+            if cached_stat.st_size > 0 and cached_stat.st_mtime >= compressed_stat.st_mtime:
+                return cache_path
+    except OSError:
+        pass
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        with gzip.open(compressed_path, "rb") as source, cache_path.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
+        if cache_path.exists() and cache_path.stat().st_size > 0:
+            return cache_path
+    except OSError:
+        return None
+    return None
+
+
+def _first_resolved_font(candidates: Sequence[Path]) -> Path | None:
+    for candidate in candidates:
+        resolved = _resolve_font_file(candidate)
+        if resolved:
+            return resolved
+    return None
+
+
 def _register_fonts() -> Tuple[str, str]:
-    medium_path = next((path for path in MEDIUM_FONT_CANDIDATES if path.exists()), None)
-    bold_path = next((path for path in BOLD_FONT_CANDIDATES if path.exists()), None)
+    medium_path = _first_resolved_font(MEDIUM_FONT_CANDIDATES)
+    bold_path = _first_resolved_font(BOLD_FONT_CANDIDATES)
     try:
         if medium_path and HACKAJOB_MEDIUM not in pdfmetrics.getRegisteredFontNames():
             pdfmetrics.registerFont(TTFont(HACKAJOB_MEDIUM, str(medium_path)))
@@ -216,7 +259,7 @@ def _register_fonts() -> Tuple[str, str]:
 
 
 def _register_bullet_font(fallback: str) -> str:
-    bullet_path = next((path for path in BULLET_FONT_CANDIDATES if path.exists()), None)
+    bullet_path = _first_resolved_font(BULLET_FONT_CANDIDATES)
     try:
         if bullet_path and HACKAJOB_BULLET not in pdfmetrics.getRegisteredFontNames():
             pdfmetrics.registerFont(TTFont(HACKAJOB_BULLET, str(bullet_path)))
