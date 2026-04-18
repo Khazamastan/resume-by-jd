@@ -279,6 +279,15 @@ def test_ats_body_and_headline_colors_follow_selected_accent():
     )
 
 
+def test_ats_styles_follow_theme_font_sizes():
+    compact_styles = _build_ats_styles(Theme(template="ats", body_size=9.0, heading_size=12.0))
+    expanded_styles = _build_ats_styles(Theme(template="ats", body_size=13.0, heading_size=17.0))
+
+    assert expanded_styles["ATSBody"].fontSize > compact_styles["ATSBody"].fontSize
+    assert expanded_styles["ATSSection"].fontSize > compact_styles["ATSSection"].fontSize
+    assert expanded_styles["ATSExperienceHeader"].fontSize > compact_styles["ATSExperienceHeader"].fontSize
+
+
 def test_ats_technical_skill_labels_are_bold_for_all_categories():
     styles = _build_ats_styles(Theme(template="ats"))
     section = ResumeSection(

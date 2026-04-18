@@ -63,6 +63,45 @@ def _fmt_date(value: str | None) -> str:
         return str(value)
 
 
+def _fmt_year(value: object | None) -> str:
+    if value is None:
+        return ""
+    text = _sanitize_text(value).strip()
+    if not text:
+        return ""
+    if re.fullmatch(r"\d{4}", text):
+        return text
+    try:
+        parsed = date_parser.parse(text)
+        return parsed.strftime("%Y")
+    except (ValueError, TypeError):
+        return text
+
+
+def _education_year_text(item: dict) -> str:
+    explicit_year = _sanitize_text(item.get("year")).strip()
+    if explicit_year:
+        return explicit_year
+
+    start_year = _fmt_year(item.get("start"))
+    end_year = _fmt_year(item.get("end"))
+    if start_year and end_year:
+        if start_year == end_year:
+            return start_year
+        return f"{start_year}-{end_year}"
+    return end_year or start_year
+
+
+def _education_grade_text(item: dict) -> str:
+    raw_grade = _sanitize_text(item.get("grade")).strip()
+    if not raw_grade:
+        return ""
+    lowered = raw_grade.lower()
+    if lowered.startswith(("grade", "cgpa", "gpa", "percentage", "percent", "score", "marks")):
+        return raw_grade
+    return f"Grade: {raw_grade}"
+
+
 def _format_experience_entry(item: dict) -> Dict[str, object]:
     role = _sanitize_text(item.get("role") or item.get("title"))
     company = _sanitize_text(item.get("company"))
@@ -422,7 +461,7 @@ def _sanitize_profile(profile: ResumeProfile) -> None:
                 entry["bullets"] = cleaned_bullets
     if profile.education:
         for record in profile.education:
-            for field in ("institution", "school", "degree", "location"):
+            for field in ("institution", "school", "degree", "location", "year", "start", "end", "grade"):
                 if field in record:
                     record[field] = _sanitize_text(record.get(field)).strip()
             if "details" in record and isinstance(record["details"], list):
@@ -767,19 +806,14 @@ def build_resume_document(
     # Education section
     education_lines: List[str] = []
     for edu in profile.education:
-        school = edu.get("institution") or edu.get("school")
-        degree = edu.get("degree")
-        end = edu.get("end")
-        entry_parts = [part for part in [school, degree] if part]
+        school = _sanitize_text(edu.get("institution") or edu.get("school")).strip()
+        degree = _sanitize_text(edu.get("degree")).strip()
+        location = _sanitize_text(edu.get("location")).strip()
+        year_text = _education_year_text(edu)
+        grade_text = _education_grade_text(edu)
+        entry_parts = [part for part in [school, degree, location, year_text, grade_text] if part]
         if entry_parts:
-            line = " | ".join(entry_parts)
-            if end:
-                try:
-                    date_value = date_parser.parse(str(end))
-                    line += f" ({date_value.strftime('%Y')})"
-                except (ValueError, TypeError):
-                    line += f" ({end})"
-            education_lines.append(line)
+            education_lines.append(" | ".join(entry_parts))
         for detail in edu.get("details", []) or []:
             education_lines.append(f"■ {detail}")
     ref_education_section = next(

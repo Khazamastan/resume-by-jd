@@ -18,7 +18,7 @@ import {
   useToast,
   VStack,
 } from '@chakra-ui/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiDownload, FiExternalLink, FiPenTool, FiRefreshCcw } from 'react-icons/fi';
 
 import { EditResumeModal } from '@/features/editor/components/EditResumeModal';
@@ -219,8 +219,35 @@ function SessionSummary({ profileName, headline, sections, onEdit, onReset, isBu
 export default function App() {
   const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { session, generate, isGenerating, generateError, reset, isUpdating, update, updateError } = useResumeSession();
+  const {
+    session,
+    generate,
+    isGenerating,
+    generateError,
+    reset,
+    isUpdating,
+    update,
+    updateError,
+    loadById,
+    isLoadingSession,
+    loadError,
+  } = useResumeSession();
+  const deepLink = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return { resumeId: '', openEditor: false };
+    }
+    const params = new URLSearchParams(window.location.search);
+    const resumeId = (params.get('resume_id') ?? '').trim();
+    const openEditorRaw = (params.get('open_editor') ?? '').trim().toLowerCase();
+    return {
+      resumeId,
+      openEditor: openEditorRaw === '1' || openEditorRaw === 'true' || openEditorRaw === 'yes',
+    };
+  }, []);
   const hasAutoBootstrapped = useRef(false);
+  const hasAttemptedDeepLinkLoad = useRef(false);
+  const hasFinishedDeepLinkLoad = useRef(!deepLink.resumeId);
+  const hasAutoOpenedDeepLinkEditor = useRef(false);
   const [isGenerateButtonLoading, setIsGenerateButtonLoading] = useState(false);
   const pdfUrl = usePdfUrl(session?.pdf ?? null);
   const atsPdfUrl = usePdfUrl(session?.ats_pdf ?? null);
@@ -246,7 +273,58 @@ export default function App() {
   }, [updateError, toast]);
 
   useEffect(() => {
+    if (!deepLink.resumeId) {
+      return;
+    }
+    if (hasAttemptedDeepLinkLoad.current) {
+      return;
+    }
+    if (session || isGenerating || isUpdating || isLoadingSession) {
+      return;
+    }
+    hasAttemptedDeepLinkLoad.current = true;
+    loadById(deepLink.resumeId)
+      .catch(() => undefined)
+      .finally(() => {
+        hasFinishedDeepLinkLoad.current = true;
+      });
+  }, [deepLink.resumeId, isGenerating, isLoadingSession, isUpdating, loadById, session]);
+
+  useEffect(() => {
+    if (loadError) {
+      toast({
+        title: 'Linked resume not found',
+        description: loadError instanceof Error ? loadError.message : 'Unable to load linked resume session.',
+        status: 'warning',
+      });
+    }
+  }, [loadError, toast]);
+
+  useEffect(() => {
+    if (!deepLink.resumeId) {
+      return;
+    }
+    if (!deepLink.openEditor) {
+      return;
+    }
+    if (!session || session.resume_id !== deepLink.resumeId) {
+      return;
+    }
+    if (hasAutoOpenedDeepLinkEditor.current) {
+      return;
+    }
+    hasAutoOpenedDeepLinkEditor.current = true;
+    onOpen();
+  }, [deepLink.openEditor, deepLink.resumeId, onOpen, session]);
+
+  useEffect(() => {
     if (hasAutoBootstrapped.current) {
+      return;
+    }
+    if (deepLink.resumeId && !hasFinishedDeepLinkLoad.current) {
+      return;
+    }
+    if (deepLink.resumeId && session?.resume_id === deepLink.resumeId) {
       return;
     }
     if (session || isGenerating || isUpdating) {
@@ -254,7 +332,7 @@ export default function App() {
     }
     hasAutoBootstrapped.current = true;
     generate({ sampleProfile: defaultSampleProfileId }).catch(() => undefined);
-  }, [generate, isGenerating, isUpdating, session]);
+  }, [deepLink.resumeId, generate, isGenerating, isUpdating, session]);
 
   const handleGenerate = useCallback(
     async (params: GenerateResumeParams) => {
@@ -272,6 +350,13 @@ export default function App() {
       }
     },
     [generate, toast],
+  );
+
+  const handleAutoGenerate = useCallback(
+    async (params: GenerateResumeParams) => {
+      await generate(params);
+    },
+    [generate],
   );
 
   const handleReset = useCallback(() => {
@@ -333,7 +418,12 @@ export default function App() {
             <Box w="full" maxW={{ base: '100%', xl: '1660px' }} mx="auto">
               <Grid templateColumns={{ base: '1fr', xl: '400px minmax(0, 1fr)' }} gap={{ base: 4, xl: 3 }} alignItems="start">
                 <Stack spacing={4} w="full" maxW={{ base: '100%', xl: '400px' }} mx={{ base: 0, xl: 'auto' }}>
-                  <GeneratorForm formId={generatorFormId} onGenerate={handleGenerate} isGenerating={isGenerating} />
+                  <GeneratorForm
+                    formId={generatorFormId}
+                    onGenerate={handleGenerate}
+                    onAutoGenerate={handleAutoGenerate}
+                    isGenerating={isGenerating}
+                  />
                   {session && (
                     <SessionSummary
                       profileName={session.profile?.name}

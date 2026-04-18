@@ -81,6 +81,32 @@ def test_education_section_uses_additional_fallback_when_profile_missing():
     assert "Dean's List 2014-2016" in education_section.bullets
 
 
+def test_education_section_reads_institution_degree_location_year_from_profile():
+    theme = Theme()
+    reference = ReferenceStructure(theme=theme, sections=[ResumeSection(title="Education")])
+    profile = ResumeProfile(
+        name="Alex Taylor",
+        education=[
+            {
+                "institution": "Rajiv Gandhi University of Knowledge Technologies",
+                "degree": "B.Tech in Mechanical Engineering",
+                "location": "R.K. Valley, Andhra Pradesh",
+                "year": "2010-2014",
+                "grade": "8.4 CGPA",
+            }
+        ],
+    )
+    insights = SkillInsights()
+
+    document = build_resume_document(reference, profile, insights)
+
+    education_section = next(section for section in document.sections if section.title == "Education")
+    assert (
+        "Rajiv Gandhi University of Knowledge Technologies | B.Tech in Mechanical Engineering | "
+        "R.K. Valley, Andhra Pradesh | 2010-2014 | Grade: 8.4 CGPA"
+    ) in education_section.paragraphs
+
+
 def test_format_experience_entry_trims_leading_dash_when_no_start_date():
     profile = ResumeProfile(
         name="Taylor",

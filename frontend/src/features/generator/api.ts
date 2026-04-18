@@ -18,10 +18,13 @@ export interface GenerateResumeParams {
   profile?: File;
   jobDescriptionFile?: File;
   jobText?: string;
+  resumeText?: string;
   sampleProfile?: string;
   accentColor?: string;
   primaryColor?: string;
   atsFontFamily?: string;
+  bodySize?: number;
+  headingSize?: number;
 }
 
 export async function generateResume({
@@ -29,10 +32,13 @@ export async function generateResume({
   profile,
   jobDescriptionFile,
   jobText,
+  resumeText,
   sampleProfile,
   accentColor,
   primaryColor,
   atsFontFamily,
+  bodySize,
+  headingSize,
 }: GenerateResumeParams = {}): Promise<ResumeDocumentPayload> {
   const formData = new FormData();
   if (reference) {
@@ -48,6 +54,10 @@ export async function generateResume({
 
   if (jobText) {
     formData.append('job_text', jobText);
+  }
+
+  if (resumeText) {
+    formData.append('resume_text', resumeText);
   }
 
   if (sampleProfile) {
@@ -66,6 +76,14 @@ export async function generateResume({
     formData.append('ats_font_family', atsFontFamily);
   }
 
+  if (typeof bodySize === 'number' && Number.isFinite(bodySize)) {
+    formData.append('body_size', String(bodySize));
+  }
+
+  if (typeof headingSize === 'number' && Number.isFinite(headingSize)) {
+    formData.append('heading_size', String(headingSize));
+  }
+
   const { data } = await api.post<ResumeDocumentPayload>('/api/generate', formData);
   return data;
 }
@@ -77,9 +95,20 @@ export async function fetchSampleProfiles(): Promise<SampleProfilesResponse> {
 
 export async function updateResume(
   resumeId: string,
-  payload: { sections: unknown[]; profile?: ResumeProfile; theme?: Record<string, unknown> },
+  payload: { sections: unknown[]; profile?: ResumeProfile; theme?: Record<string, unknown>; resumeText?: string },
 ): Promise<ResumeDocumentPayload> {
-  const { data } = await api.put<ResumeDocumentPayload>('/api/resume/' + resumeId, payload);
+  const requestPayload = {
+    sections: payload.sections,
+    profile: payload.profile,
+    theme: payload.theme,
+    resume_text: payload.resumeText,
+  };
+  const { data } = await api.put<ResumeDocumentPayload>('/api/resume/' + resumeId, requestPayload);
+  return data;
+}
+
+export async function fetchResume(resumeId: string): Promise<ResumeDocumentPayload> {
+  const { data } = await api.get<ResumeDocumentPayload>('/api/resume/' + resumeId);
   return data;
 }
 

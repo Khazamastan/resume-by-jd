@@ -106,3 +106,23 @@ def test_profile_to_canonical_serializes_categorized_skills_mapping():
         "backend": ["Node.js", "Express.js"],
         "ai_devops": ["Codex", "AWS"],
     }
+
+
+def test_profile_to_canonical_preserves_education_year_field():
+    profile = ResumeProfile(
+        name="Khaja",
+        education=[
+            {
+                "institution": "Rajiv Gandhi University of Knowledge Technologies",
+                "degree": "B.Tech in Mechanical Engineering",
+                "location": "R.K. Valley, Andhra Pradesh",
+                "year": "2010-2014",
+                "grade": "8.4 CGPA",
+            }
+        ],
+    )
+
+    canonical = profile_to_canonical(profile)
+
+    assert canonical["education"][0]["year"] == "2010-2014"
+    assert canonical["education"][0]["grade"] == "8.4 CGPA"

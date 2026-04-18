@@ -233,7 +233,7 @@ def _canonical_education(records: List[Dict[str, Any]]) -> List[OrderedDict[str,
         if not isinstance(record, dict):
             continue
         entry: OrderedDict[str, Any] = OrderedDict()
-        for key in ("institution", "degree", "location", "start", "end"):
+        for key in ("institution", "degree", "location", "year", "start", "end", "grade"):
             value = record.get(key)
             if value:
                 entry[key] = value

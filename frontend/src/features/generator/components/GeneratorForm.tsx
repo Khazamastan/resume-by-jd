@@ -21,8 +21,8 @@ import {
   useBoolean,
   VStack,
 } from '@chakra-ui/react';
-import { useCallback, useEffect, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 
 import {
   defaultSampleProfileId,
@@ -35,6 +35,7 @@ import { useThemeSettings } from '@/theme/ThemeSettingsProvider';
 
 interface GeneratorFormProps {
   onGenerate: (params: GenerateResumeParams) => Promise<void>;
+  onAutoGenerate?: (params: GenerateResumeParams) => Promise<void>;
   isGenerating: boolean;
   formId?: string;
 }
@@ -45,8 +46,11 @@ interface GeneratorFormValues {
   profile?: FileList;
   jobDescriptionFile?: FileList;
   jobText?: string;
+  resumeText?: string;
   accentKey: AccentKey;
   atsFontFamily: string;
+  bodySize: number;
+  headingSize: number;
 }
 
 const ATS_FONT_OPTIONS = [
@@ -63,6 +67,10 @@ const ATS_FONT_OPTIONS = [
   'Lato',
   'Aptos',
 ];
+const DEFAULT_BODY_FONT_SIZE = 10;
+const DEFAULT_HEADING_FONT_SIZE = 12;
+const MIN_FONT_SIZE = 6;
+const MAX_FONT_SIZE = 24;
 
 function fileFromList(list?: FileList | null): File | undefined {
   if (!list || list.length === 0) {
@@ -71,11 +79,26 @@ function fileFromList(list?: FileList | null): File | undefined {
   return list[0] ?? undefined;
 }
 
-export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-form' }: GeneratorFormProps) {
+function styleSignature(accentKey: AccentKey, atsFontFamily: string, bodySize: number, headingSize: number): string {
+  const font = (atsFontFamily || '').trim().toLowerCase();
+  const body = Number.isFinite(bodySize) ? bodySize : DEFAULT_BODY_FONT_SIZE;
+  const heading = Number.isFinite(headingSize) ? headingSize : DEFAULT_HEADING_FONT_SIZE;
+  return `${accentKey}|${font}|${body}|${heading}`;
+}
+
+export function GeneratorForm({
+  onGenerate,
+  onAutoGenerate,
+  isGenerating,
+  formId = 'generator-form',
+}: GeneratorFormProps) {
   const { setAccent } = useThemeSettings();
   const [sampleProfiles, setSampleProfiles] = useState<SampleProfileSummary[]>([]);
   const [sampleProfilesError, setSampleProfilesError] = useState<string | null>(null);
   const [isSampleProfilesLoading, setIsSampleProfilesLoading] = useState(true);
+  const autoGenerateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAutoGenerateRef = useRef(false);
+  const initialStyleSignatureRef = useRef<string | null>(null);
 
   const {
     control,
@@ -83,16 +106,76 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
     handleSubmit,
     reset,
     setValue,
+    getValues,
     formState: { errors, isSubmitSuccessful },
   } = useForm<GeneratorFormValues>({
     defaultValues: {
       sampleProfile: defaultSampleProfileId,
       jobText: '',
+      resumeText: '',
       accentKey: defaultAccent,
       atsFontFamily: 'Calibri',
+      bodySize: DEFAULT_BODY_FONT_SIZE,
+      headingSize: DEFAULT_HEADING_FONT_SIZE,
     },
   });
   const [hasSubmitted, setHasSubmitted] = useBoolean();
+  const [watchedAccentKey, watchedAtsFontFamily, watchedBodySize, watchedHeadingSize] = useWatch({
+    control,
+    name: ['accentKey', 'atsFontFamily', 'bodySize', 'headingSize'],
+  });
+
+  const currentStyleSignature = useMemo(
+    () =>
+      styleSignature(
+        watchedAccentKey ?? defaultAccent,
+        watchedAtsFontFamily ?? 'Calibri',
+        Number(watchedBodySize),
+        Number(watchedHeadingSize),
+      ),
+    [watchedAccentKey, watchedAtsFontFamily, watchedBodySize, watchedHeadingSize],
+  );
+
+  const buildGenerateParams = useCallback(
+    (values: GeneratorFormValues): GenerateResumeParams => {
+      const reference = fileFromList(values.reference);
+      const profile = fileFromList(values.profile);
+      const selectedAccent = values.accentKey ?? defaultAccent;
+      const accentColor = selectedAccent === 'reference' ? undefined : getAccentHex(selectedAccent);
+
+      return {
+        reference: reference ?? undefined,
+        profile: profile ?? undefined,
+        jobDescriptionFile: fileFromList(values.jobDescriptionFile ?? null) ?? undefined,
+        jobText: values.jobText?.trim() ? values.jobText.trim() : undefined,
+        resumeText: values.resumeText?.trim() ? values.resumeText.trim() : undefined,
+        sampleProfile: values.sampleProfile?.trim() || defaultSampleProfileId,
+        accentColor,
+        atsFontFamily: values.atsFontFamily?.trim() || 'Calibri',
+        bodySize: Number.isFinite(values.bodySize) ? values.bodySize : DEFAULT_BODY_FONT_SIZE,
+        headingSize: Number.isFinite(values.headingSize) ? values.headingSize : DEFAULT_HEADING_FONT_SIZE,
+      };
+    },
+    [],
+  );
+
+  const autoGenerateHandler = onAutoGenerate ?? onGenerate;
+
+  const runAutoGenerate = useCallback(async () => {
+    if (!pendingAutoGenerateRef.current || isGenerating) {
+      return;
+    }
+    pendingAutoGenerateRef.current = false;
+    const values = getValues();
+    await autoGenerateHandler(buildGenerateParams(values));
+    initialStyleSignatureRef.current = styleSignature(
+      values.accentKey ?? defaultAccent,
+      values.atsFontFamily ?? 'Calibri',
+      Number(values.bodySize),
+      Number(values.headingSize),
+    );
+    setHasSubmitted.on();
+  }, [autoGenerateHandler, buildGenerateParams, getValues, isGenerating, setHasSubmitted]);
 
   useEffect(() => {
     let isMounted = true;
@@ -132,26 +215,65 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
     };
   }, [setValue]);
 
+  useEffect(() => {
+    if (initialStyleSignatureRef.current === null) {
+      initialStyleSignatureRef.current = currentStyleSignature;
+      return;
+    }
+    if (currentStyleSignature === initialStyleSignatureRef.current) {
+      return;
+    }
+    pendingAutoGenerateRef.current = true;
+    if (autoGenerateTimeoutRef.current) {
+      clearTimeout(autoGenerateTimeoutRef.current);
+    }
+    autoGenerateTimeoutRef.current = setTimeout(() => {
+      void runAutoGenerate();
+    }, 450);
+  }, [currentStyleSignature, runAutoGenerate]);
+
+  useEffect(() => {
+    if (!isGenerating && pendingAutoGenerateRef.current) {
+      if (autoGenerateTimeoutRef.current) {
+        clearTimeout(autoGenerateTimeoutRef.current);
+      }
+      autoGenerateTimeoutRef.current = setTimeout(() => {
+        void runAutoGenerate();
+      }, 120);
+    }
+  }, [isGenerating, runAutoGenerate]);
+
+  useEffect(() => {
+    return () => {
+      if (autoGenerateTimeoutRef.current) {
+        clearTimeout(autoGenerateTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const submit = handleSubmit(async (values) => {
-    const reference = fileFromList(values.reference);
-    const profile = fileFromList(values.profile);
-
-    const selectedAccent = values.accentKey ?? defaultAccent;
-    const accentColor = selectedAccent === 'reference' ? undefined : getAccentHex(selectedAccent);
-
-    await onGenerate({
-      reference: reference ?? undefined,
-      profile: profile ?? undefined,
-      jobDescriptionFile: fileFromList(values.jobDescriptionFile ?? null) ?? undefined,
-      jobText: values.jobText?.trim() ? values.jobText.trim() : undefined,
-      sampleProfile: values.sampleProfile?.trim() || defaultSampleProfileId,
-      accentColor,
-      atsFontFamily: values.atsFontFamily?.trim() || 'Calibri',
-    });
+    await onGenerate(buildGenerateParams(values));
+    initialStyleSignatureRef.current = styleSignature(
+      values.accentKey ?? defaultAccent,
+      values.atsFontFamily ?? 'Calibri',
+      Number(values.bodySize),
+      Number(values.headingSize),
+    );
+    pendingAutoGenerateRef.current = false;
     setHasSubmitted.on();
   });
 
   const handleReset = useCallback(() => {
+    if (autoGenerateTimeoutRef.current) {
+      clearTimeout(autoGenerateTimeoutRef.current);
+    }
+    pendingAutoGenerateRef.current = false;
+    initialStyleSignatureRef.current = styleSignature(
+      defaultAccent,
+      'Calibri',
+      DEFAULT_BODY_FONT_SIZE,
+      DEFAULT_HEADING_FONT_SIZE,
+    );
     reset();
     setHasSubmitted.off();
   }, [reset, setHasSubmitted]);
@@ -299,6 +421,23 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
               Paste snippets if the posting is online only. File upload and text can be combined.
             </FormHelperText>
           </FormControl>
+
+          <FormControl>
+            <FormLabel color="text.subtle">
+              Resume Text
+            </FormLabel>
+            <Textarea
+              minH="260px"
+              placeholder="Paste your full resume text here. We will parse it into sections, generate the PDF, and load it for editing."
+              {...register('resumeText')}
+              bg="surface.card"
+              borderColor="border.muted"
+              _hover={{ borderColor: 'brand.300' }}
+            />
+            <FormHelperText color="text.muted">
+              If provided, this text becomes the source resume content and is auto-filled into the editor.
+            </FormHelperText>
+          </FormControl>
         </Stack>
 
         <FormControl>
@@ -353,7 +492,7 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
 
         <FormControl>
           <FormLabel color="text.subtle">
-            ATS Font Family
+            Resume Font Family
           </FormLabel>
           <Controller
             name="atsFontFamily"
@@ -375,9 +514,41 @@ export function GeneratorForm({ onGenerate, isGenerating, formId = 'generator-fo
             )}
           />
           <FormHelperText color="text.muted">
-            Applies only to ATS PDF font rendering. The regular resume design is unchanged.
+            Applies to both ATS and Hackajob resume PDF rendering.
           </FormHelperText>
         </FormControl>
+
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
+          <FormControl>
+            <FormLabel color="text.subtle">Body Font Size (pt)</FormLabel>
+            <Input
+              type="number"
+              step="0.5"
+              min={MIN_FONT_SIZE}
+              max={MAX_FONT_SIZE}
+              {...register('bodySize', { valueAsNumber: true })}
+              bg="surface.card"
+              borderColor="border.muted"
+              _hover={{ borderColor: 'brand.300' }}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel color="text.subtle">Heading Font Size (pt)</FormLabel>
+            <Input
+              type="number"
+              step="0.5"
+              min={MIN_FONT_SIZE}
+              max={MAX_FONT_SIZE}
+              {...register('headingSize', { valueAsNumber: true })}
+              bg="surface.card"
+              borderColor="border.muted"
+              _hover={{ borderColor: 'brand.300' }}
+            />
+          </FormControl>
+        </SimpleGrid>
+        <Text fontSize="sm" color="text.muted">
+          Controls resume text sizes in generated PDF output. Range: {MIN_FONT_SIZE} to {MAX_FONT_SIZE} pt.
+        </Text>
 
         <Button size="sm" onClick={handleReset} variant="ghost" colorScheme="gray" alignSelf="flex-start" isDisabled={isGenerating}>
           Clear

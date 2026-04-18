@@ -1517,11 +1517,17 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
     if selected_ats_font == "spacegrotesk":
         # Keep SpaceGrotesk content at regular weight for better readability.
         ats_content_font = ats_body_font
-    body_size = max(9.0, min(float(theme.body_size or 10.0) + 1.0, 12.0))
-    heading_size = max(body_size + 2.2, 12.5)
-    name_size = max(17.8, heading_size + 3.8)
-    headline_size = max(9.8, heading_size - 0.8)
-    section_heading_size = max(10.6, heading_size - 1.0)
+    body_size = float(theme.body_size or 10.0)
+    if body_size <= 0:
+        body_size = 10.0
+    body_size = max(6.0, body_size)
+    heading_size = float(theme.heading_size or (body_size + 2.0))
+    if heading_size <= 0:
+        heading_size = body_size + 2.0
+    heading_size = max(heading_size, body_size + 1.0)
+    name_size = max(body_size + 4.8, heading_size + 3.4)
+    headline_size = max(body_size + 0.2, heading_size - 0.8)
+    section_heading_size = max(body_size + 0.8, heading_size - 1.0)
     accent_hex = _plain_text(theme.accent_color or theme.primary_color or "#111827")
     if accent_hex and not accent_hex.startswith("#"):
         accent_hex = f"#{accent_hex}"
@@ -1595,8 +1601,8 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
         ParagraphStyle(
             "ATSContact",
             parent=styles["ATSBody"],
-            fontSize=max(body_size - 0.2, 9.0),
-            leading=max(body_size - 0.2, 9.0) * 1.2,
+            fontSize=max(body_size - 0.2, 7.0),
+            leading=max(body_size - 0.2, 7.0) * 1.2,
             textColor=contact_color,
             spaceAfter=7,
         )
@@ -1618,8 +1624,8 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
             "ATSExperienceHeader",
             parent=styles["ATSBody"],
             fontName=ats_bold_font,
-            fontSize=max(body_size + 0.25, 10.0),
-            leading=max(body_size + 0.25, 10.0) * 1.2,
+            fontSize=body_size + 0.25,
+            leading=(body_size + 0.25) * 1.2,
             textColor=section_color,
             spaceAfter=1.4,
         )
@@ -1628,8 +1634,8 @@ def _build_ats_styles(theme: Theme) -> StyleSheet1:
         ParagraphStyle(
             "ATSMeta",
             parent=styles["ATSBody"],
-            fontSize=max(body_size - 0.3, 8.8),
-            leading=max(body_size - 0.3, 8.8) * 1.2,
+            fontSize=max(body_size - 0.3, 6.5),
+            leading=max(body_size - 0.3, 6.5) * 1.2,
             textColor=muted_color,
             spaceAfter=3,
         )

@@ -36,7 +36,7 @@ def test_build_profile_from_reference_returns_sample_profile():
                     "Implemented cross-region disaster recovery workflows to maintain 100% operational continuity during outages.",
                     "Bootstrapped MAUI-based next-gen Identity console, cutting maintenance effort by 40% and accelerating feature delivery by 30%.",
                     "Redesigned MFA sign-on policy to gather customer consent and alert administrators, strengthening security posture.",
-                    "Migrated TeamCity pipelines to OCI build systems, unified repositories in OCI DevOps SCM, and automated canary health checks every 15 minutes.",
+                    "Migrated TeamCity pipelines to OCI build systems, unified repositories in OCI DevOps SCM, and automated frequent canary health checks.",
                     "Consolidated multiple profile experiences into the reusable One My Profile UI, reducing development effort by 60%.",
                     "Integrated Apple as a social identity provider to expand authentication options.",
                     "Delivered UI for National Digital Identity features, including Identity Proofing, Verification Provider, Credential Type, and Digital Wallet workflows.",

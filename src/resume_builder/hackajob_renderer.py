@@ -20,7 +20,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Paragraph
 
-from .models import ResumeDocument, ResumeSection
+from .models import ResumeDocument, ResumeSection, Theme
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ASSET_DIR = PROJECT_ROOT / "assets" / "hackajob"
@@ -28,6 +28,8 @@ LOGO_DIR = ASSET_DIR / "logos"
 FONT_DIR = ASSET_DIR / "fonts"
 ICON_DIR = PROJECT_ROOT / "assets" / "icons"
 SPACE_GROTESK_COMPLETE_DIR = PROJECT_ROOT / "SpaceGrotesk_Complete" / "Fonts"
+ATS_FONT_DOWNLOAD_DIR = PROJECT_ROOT / "assets" / "ats_fonts"
+_COMPANY_CLEAN_PATTERN = re.compile(r"[^a-z0-9]+")
 
 DEFAULT_ACCENT_HEX = "#74dcc0"
 PAGE_BG_HEX = "#ffffff"
@@ -50,8 +52,7 @@ CARD_PAD_BOTTOM = 10
 CARD_BORDER_WIDTH = 0.75
 DIVIDER_LINE_WIDTH = 0.65
 
-HACKAJOB_MEDIUM = "HackajobSpaceGroteskMedium"
-HACKAJOB_BOLD = "HackajobSpaceGroteskBold"
+HACKAJOB_FONT_PREFIX = "Hackajob"
 HACKAJOB_BULLET = "HackajobUnicodeBullet"
 EXPERIENCE_BULLET_CHAR = "-"
 EXPERIENCE_BULLET_X_OFFSET = 44
@@ -76,21 +77,73 @@ FORCED_BULLET_HIGHLIGHTS: Tuple[str, ...] = (
     "Angular",
 )
 
-MEDIUM_FONT_CANDIDATES = [
+SPACE_GROTESK_MEDIUM_CANDIDATES = [
     SPACE_GROTESK_COMPLETE_DIR / "WEB" / "fonts" / "SpaceGrotesk-Medium.ttf",
     SPACE_GROTESK_COMPLETE_DIR / "OTF" / "SpaceGrotesk-Medium.otf",
     SPACE_GROTESK_COMPLETE_DIR / "WEB" / "fonts" / "SpaceGrotesk-Regular.ttf",
     FONT_DIR / "spacegrotesk-medium.ttf",
     FONT_DIR / "spacegrotesk-medium-subset.ttf",
+    ATS_FONT_DOWNLOAD_DIR / "SpaceGrotesk-Medium.ttf",
+    ATS_FONT_DOWNLOAD_DIR / "SpaceGrotesk-Regular.ttf",
 ]
 
-BOLD_FONT_CANDIDATES = [
+SPACE_GROTESK_BOLD_CANDIDATES = [
     SPACE_GROTESK_COMPLETE_DIR / "WEB" / "fonts" / "SpaceGrotesk-Bold.ttf",
     SPACE_GROTESK_COMPLETE_DIR / "OTF" / "SpaceGrotesk-Bold.otf",
     SPACE_GROTESK_COMPLETE_DIR / "WEB" / "fonts" / "SpaceGrotesk-SemiBold.ttf",
     FONT_DIR / "spacegrotesk-bold.ttf",
     FONT_DIR / "spacegrotesk-bold-subset.ttf",
+    ATS_FONT_DOWNLOAD_DIR / "SpaceGrotesk-Bold.ttf",
+    ATS_FONT_DOWNLOAD_DIR / "SpaceGrotesk-Regular.ttf",
 ]
+
+ATS_FONT_FAMILY_CANDIDATES: Dict[str, Dict[str, List[Path]]] = {
+    "spacegrotesk": {
+        "medium": SPACE_GROTESK_MEDIUM_CANDIDATES,
+        "bold": SPACE_GROTESK_BOLD_CANDIDATES,
+    },
+    "calibri": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Carlito-Regular.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Carlito-Bold.ttf"],
+    },
+    "arial": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Arimo-Variable.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Arimo-Variable.ttf"],
+    },
+    "georgia": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Tinos-Regular.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Tinos-Bold.ttf"],
+    },
+    "helvetica": {},
+    "garamond": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "EBGaramond-Variable.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "EBGaramond-Variable.ttf"],
+    },
+    "tahoma": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Arimo-Variable.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Arimo-Variable.ttf"],
+    },
+    "times new roman": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Tinos-Regular.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Tinos-Bold.ttf"],
+    },
+    "cambria": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Caladea-Regular.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Caladea-Bold.ttf"],
+    },
+    "montserrat": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Montserrat-Medium.ttf", ATS_FONT_DOWNLOAD_DIR / "Montserrat-Variable.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Montserrat-Bold.ttf", ATS_FONT_DOWNLOAD_DIR / "Montserrat-Variable.ttf"],
+    },
+    "lato": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Lato-Medium.ttf", ATS_FONT_DOWNLOAD_DIR / "Lato-Regular.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Lato-Bold.ttf", ATS_FONT_DOWNLOAD_DIR / "Lato-Medium.ttf"],
+    },
+    "aptos": {
+        "medium": [ATS_FONT_DOWNLOAD_DIR / "Carlito-Regular.ttf"],
+        "bold": [ATS_FONT_DOWNLOAD_DIR / "Carlito-Bold.ttf"],
+    },
+}
 
 BULLET_FONT_CANDIDATES = [
     FONT_DIR / "NotoSans-Regular.ttf",
@@ -238,23 +291,85 @@ def _first_resolved_font(candidates: Sequence[Path]) -> Path | None:
     return None
 
 
-def _register_fonts() -> Tuple[str, str]:
-    medium_path = _first_resolved_font(MEDIUM_FONT_CANDIDATES)
-    bold_path = _first_resolved_font(BOLD_FONT_CANDIDATES)
-    try:
-        if medium_path and HACKAJOB_MEDIUM not in pdfmetrics.getRegisteredFontNames():
-            pdfmetrics.registerFont(TTFont(HACKAJOB_MEDIUM, str(medium_path)))
-    except Exception:
-        pass
-    try:
-        if bold_path and HACKAJOB_BOLD not in pdfmetrics.getRegisteredFontNames():
-            pdfmetrics.registerFont(TTFont(HACKAJOB_BOLD, str(bold_path)))
-    except Exception:
-        pass
+def _normalize_font_token(value: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9]+", " ", (value or "").strip().lower())
+    return re.sub(r"\s+", " ", cleaned).strip()
 
-    medium_name = HACKAJOB_MEDIUM if HACKAJOB_MEDIUM in pdfmetrics.getRegisteredFontNames() else "Helvetica"
-    bold_name = HACKAJOB_BOLD if HACKAJOB_BOLD in pdfmetrics.getRegisteredFontNames() else "Helvetica-Bold"
-    return medium_name, bold_name
+
+def _coerce_theme_font_size(value: object, fallback: float) -> float:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        numeric = fallback
+    if numeric <= 0:
+        numeric = fallback
+    return max(6.0, min(numeric, 24.0))
+
+
+def _canonical_font_token(candidate: str) -> str:
+    if not candidate:
+        return ""
+    if candidate in ATS_FONT_FAMILY_CANDIDATES:
+        return candidate
+    compact = candidate.replace(" ", "")
+    for token in ATS_FONT_FAMILY_CANDIDATES:
+        if token.replace(" ", "") == compact:
+            return token
+    if "spacegrotesk" in compact:
+        return "spacegrotesk"
+    return ""
+
+
+def _resolve_hackajob_font_token(theme: Theme) -> str:
+    explicit = _canonical_font_token(_normalize_font_token(getattr(theme, "ats_font_family", "")))
+    inferred = _canonical_font_token(_normalize_font_token(getattr(theme, "body_font", "")))
+    if explicit and explicit != "calibri":
+        return explicit
+    if inferred:
+        return inferred
+    if explicit:
+        return explicit
+    return "spacegrotesk"
+
+
+def _fallback_font_pair(token: str) -> Tuple[str, str]:
+    if token in {"georgia", "garamond", "times new roman", "cambria"}:
+        return "Times-Roman", "Times-Bold"
+    return "Helvetica", "Helvetica-Bold"
+
+
+def _register_ttf_font(internal_name: str, path: Path | None) -> str | None:
+    if not path:
+        return None
+    try:
+        if internal_name not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(internal_name, str(path)))
+        return internal_name if internal_name in pdfmetrics.getRegisteredFontNames() else None
+    except Exception:
+        return None
+
+
+def _register_fonts(theme: Theme) -> Tuple[str, str]:
+    token = _resolve_hackajob_font_token(theme)
+    fallback_medium, fallback_bold = _fallback_font_pair(token)
+    config = ATS_FONT_FAMILY_CANDIDATES.get(token) or {}
+    if not config:
+        return fallback_medium, fallback_bold
+
+    seed = re.sub(r"[^A-Za-z0-9]+", "", token.title()) or "Font"
+    medium_path = _first_resolved_font(list(config.get("medium", [])))
+    bold_path = _first_resolved_font(list(config.get("bold", [])))
+    medium_name = _register_ttf_font(f"{HACKAJOB_FONT_PREFIX}{seed}Medium", medium_path)
+    bold_name = _register_ttf_font(f"{HACKAJOB_FONT_PREFIX}{seed}Bold", bold_path)
+
+    resolved_medium = medium_name or fallback_medium
+    if bold_name:
+        resolved_bold = bold_name
+    elif resolved_medium.startswith(HACKAJOB_FONT_PREFIX):
+        resolved_bold = resolved_medium
+    else:
+        resolved_bold = fallback_bold
+    return resolved_medium, resolved_bold
 
 
 def _register_bullet_font(fallback: str) -> str:
@@ -290,24 +405,36 @@ def _measure_paragraph(text: str, style: ParagraphStyle, width: float) -> Tuple[
 
 def _normalize_company_key(company: str) -> str:
     lowered = _clean_text(company).lower()
-    if "oracle" in lowered:
+    normalized = _COMPANY_CLEAN_PATTERN.sub(" ", lowered).strip()
+    compact = normalized.replace(" ", "")
+
+    if "oracle" in normalized:
         return "oracle"
-    if "xactly" in lowered:
+    if "xactly" in normalized:
         return "xactly"
-    if "nineleap" in lowered:
+    if "nineleap" in normalized:
         return "nineleaps"
-    if "pwc" in lowered:
+    if "pwc" in normalized or "pricewaterhousecoopers" in compact:
         return "pwc"
-    if "elocity" in lowered:
+    if "elocity" in normalized:
         return "elocity"
-    if "peepal" in lowered:
+    if "peepal" in normalized:
         return "peepal"
-    if "talent flake" in lowered or "talentflake" in lowered:
+    if "talent flake" in normalized or "talentflake" in compact:
         return "talentflake"
-    if "minewhat" in lowered:
+    if "minewhat" in normalized:
         return "minewhat"
-    if "thrymr" in lowered:
+    if "thrymr" in normalized:
         return "thrymr"
+
+    if LOGO_DIR.exists():
+        for path in LOGO_DIR.glob("*.png"):
+            key = path.stem.lower().strip()
+            if not key or "logo" in key or "footer" in key:
+                continue
+            key_compact = _COMPANY_CLEAN_PATTERN.sub("", key)
+            if key_compact and key_compact in compact:
+                return key
     return "generic"
 
 
@@ -363,6 +490,45 @@ def _parse_date(value: str | None) -> date | None:
         return date_parser.parse(cleaned, default=datetime.today()).date()
     except (ValueError, TypeError):
         return None
+
+
+def _education_year_fragment(value: object | None) -> str:
+    text = _clean_text(value)
+    if not text:
+        return ""
+    lowered = text.lower()
+    if lowered in {"present", "current"}:
+        return "Present"
+    if re.fullmatch(r"\d{4}", text):
+        return text
+    parsed = _parse_date(text)
+    if parsed:
+        return str(parsed.year)
+    return text
+
+
+def _education_year_text(item: dict) -> str:
+    explicit_year = _education_year_fragment(item.get("year"))
+    if explicit_year:
+        return explicit_year
+
+    start_year = _education_year_fragment(item.get("start"))
+    end_year = _education_year_fragment(item.get("end"))
+    if start_year and end_year:
+        if start_year == end_year:
+            return start_year
+        return f"{start_year}-{end_year}"
+    return end_year or start_year
+
+
+def _education_grade_text(item: dict) -> str:
+    raw_grade = _clean_text(item.get("grade"))
+    if not raw_grade:
+        return ""
+    lowered = raw_grade.lower()
+    if lowered.startswith(("grade", "cgpa", "gpa", "percentage", "percent", "score", "marks")):
+        return raw_grade
+    return f"Grade: {raw_grade}"
 
 
 def _month_year(value: date | None) -> str:
@@ -442,8 +608,9 @@ def _flatten_skills(section: ResumeSection | None, fallback: Iterable[str]) -> L
                     add(str(item))
         for bullet in section.bullets:
             add(bullet)
-    for item in fallback:
-        add(str(item))
+    if not skills:
+        for item in fallback:
+            add(str(item))
     return skills
 
 
@@ -541,13 +708,16 @@ def _experience_entries(document: ResumeDocument, skill_pool: Sequence[str]) -> 
 def _education_entries(document: ResumeDocument) -> List[_EducationEntry]:
     records: List[_EducationEntry] = []
     for item in document.profile.education:
+        if not isinstance(item, dict):
+            continue
         institution = _clean_text(item.get("institution") or item.get("school"))
         degree = _clean_text(item.get("degree"))
         location = _clean_text(item.get("location"))
-        end_value = _parse_date(item.get("end"))
-        year_text = str(end_value.year) if end_value else _clean_text(item.get("end"))
-        location_year = ", ".join(part for part in [location, year_text] if part)
-        records.append(_EducationEntry(institution=institution, degree=degree, location_year=location_year))
+        year_text = _education_year_text(item)
+        grade_text = _education_grade_text(item)
+        location_year = ", ".join(part for part in [location, year_text, grade_text] if part)
+        if institution or degree or location_year:
+            records.append(_EducationEntry(institution=institution, degree=degree, location_year=location_year))
     if records:
         return records
 
@@ -555,10 +725,17 @@ def _education_entries(document: ResumeDocument) -> List[_EducationEntry]:
     if education_section:
         paragraphs = [line for line in education_section.paragraphs if _clean_text(line)]
         if paragraphs:
-            institution = _clean_text(paragraphs[0])
-            degree = _clean_text(paragraphs[1]) if len(paragraphs) > 1 else ""
-            location_year = _clean_text(paragraphs[2]) if len(paragraphs) > 2 else ""
-            records.append(_EducationEntry(institution=institution, degree=degree, location_year=location_year))
+            if len(paragraphs) == 1 and "|" in paragraphs[0]:
+                parts = [_clean_text(part) for part in paragraphs[0].split("|") if _clean_text(part)]
+                institution = parts[0] if parts else ""
+                degree = parts[1] if len(parts) > 1 else ""
+                location_year = ", ".join(parts[2:]) if len(parts) > 2 else ""
+            else:
+                institution = _clean_text(paragraphs[0])
+                degree = _clean_text(paragraphs[1]) if len(paragraphs) > 1 else ""
+                location_year = _clean_text(paragraphs[2]) if len(paragraphs) > 2 else ""
+            if institution or degree or location_year:
+                records.append(_EducationEntry(institution=institution, degree=degree, location_year=location_year))
     return records
 
 
@@ -700,6 +877,11 @@ def _skill_category_lines(section: ResumeSection | None, fallback: Iterable[str]
                 category_lines.append((category, items))
     if category_lines:
         return category_lines
+
+    if section:
+        bullet_skills = [_clean_text(item) for item in section.bullets if _clean_text(item)]
+        if bullet_skills:
+            return [("Additional Skills", bullet_skills)]
 
     fallback_skills = [_clean_text(item) for item in fallback if _clean_text(item)]
     if fallback_skills:
@@ -952,10 +1134,9 @@ class _HackajobRenderer:
     def __init__(self, document: ResumeDocument, dest: Path) -> None:
         self.document = document
         self.dest = dest
-        self.font_medium, self.font_bold = _register_fonts()
-        self.font_bullet = _register_bullet_font(self.font_medium)
-
         theme = document.theme
+        self.font_medium, self.font_bold = _register_fonts(theme)
+        self.font_bullet = _register_bullet_font(self.font_medium)
         self.page_width, self.page_height = (
             (theme.page_width, theme.page_height) if theme.page_width and theme.page_height else A4
         )
@@ -963,61 +1144,81 @@ class _HackajobRenderer:
         self.canvas = Canvas(str(dest), pagesize=(self.page_width, self.page_height))
         self.page_number = 0
         self.cursor_top = TOP_MARGIN
+        self.body_font_size = _coerce_theme_font_size(getattr(theme, "body_size", None), 10.5)
+        default_heading_size = max(self.body_font_size + 1.0, 12.0)
+        self.heading_font_size = _coerce_theme_font_size(getattr(theme, "heading_size", None), default_heading_size)
+        self.heading_font_size = max(self.heading_font_size, self.body_font_size + 0.5)
+        self.contact_font_size = max(self.body_font_size - 1.5, 7.0)
+        self.contact_leading = max(self.contact_font_size * 1.2, self.contact_font_size + 1.2)
+        self.body_leading = max(self.body_font_size * 1.52, self.body_font_size + 2.0)
+        self.meta_font_size = max(self.body_font_size - 0.2, 6.0)
+        self.meta_leading = max(self.meta_font_size * 1.43, self.meta_font_size + 1.8)
+        self.company_font_size = max(self.heading_font_size, self.body_font_size + 0.5)
+        self.company_leading = max(self.company_font_size * 1.30, self.company_font_size + 1.8)
+        self.section_font_size = self.heading_font_size
+        self.section_leading = max(self.section_font_size * 1.24, self.section_font_size + 1.4)
+        self.headline_font_size = max(self.body_font_size, self.heading_font_size - 1.0)
+        self.headline_leading = max(self.headline_font_size * 1.28, self.headline_font_size + 1.4)
+        self.name_font_size = max(self.heading_font_size + 4.0, self.body_font_size + 4.5)
+        self.name_leading = max(self.name_font_size * 1.2, self.name_font_size + 2.0)
+        self.compact_body_leading = max(self.body_font_size * 1.24, self.body_font_size + 1.5)
+        self.list_leading = max(self.body_font_size * 1.14, self.body_font_size + 1.2)
+        self.bullet_font_size = max(self.body_font_size - 3.5, 6.0)
 
         self.name_style = ParagraphStyle(
             "HackajobName",
             fontName=self.font_bold,
-            fontSize=15,
-            leading=18,
+            fontSize=self.name_font_size,
+            leading=self.name_leading,
             textColor=self.palette.text_dark,
         )
         self.headline_style = ParagraphStyle(
             "HackajobHeadline",
             fontName=self.font_medium,
-            fontSize=10.5,
-            leading=14,
+            fontSize=self.headline_font_size,
+            leading=self.headline_leading,
             textColor=self.palette.text_color,
         )
         self.contact_style = ParagraphStyle(
             "HackajobContact",
             fontName=self.font_medium,
-            fontSize=9.0,
-            leading=11,
+            fontSize=self.contact_font_size,
+            leading=self.contact_leading,
             textColor=self.palette.text_color,
         )
         self.section_title_style = ParagraphStyle(
             "HackajobSectionTitle",
             fontName=self.font_bold,
-            fontSize=10.5,
-            leading=13,
+            fontSize=self.section_font_size,
+            leading=self.section_leading,
             textColor=self.palette.text_dark,
         )
         self.body_style = ParagraphStyle(
             "HackajobBody",
             fontName=self.font_medium,
-            fontSize=10.5,
-            leading=16,
+            fontSize=self.body_font_size,
+            leading=self.body_leading,
             textColor=self.palette.text_color,
         )
         self.meta_style = ParagraphStyle(
             "HackajobMeta",
             fontName=self.font_medium,
-            fontSize=10.5,
-            leading=15,
+            fontSize=self.meta_font_size,
+            leading=self.meta_leading,
             textColor=self.palette.text_muted,
         )
         self.company_style = ParagraphStyle(
             "HackajobCompany",
             fontName=self.font_bold,
-            fontSize=10.5,
-            leading=14,
+            fontSize=self.company_font_size,
+            leading=self.company_leading,
             textColor=self.palette.text_dark,
         )
         self.experience_bullet_style = ParagraphStyle(
             "HackajobExperienceBullet",
             parent=self.body_style,
-            fontSize=10.5,
-            leading=16,
+            fontSize=self.body_font_size,
+            leading=self.body_leading,
             textColor=self.palette.text_color,
             leftIndent=0,
         )
@@ -1057,8 +1258,8 @@ class _HackajobRenderer:
         row_style = ParagraphStyle(
             "HackajobContactRow",
             parent=self.contact_style,
-            fontSize=9.0,
-            leading=11.2,
+            fontSize=self.contact_font_size,
+            leading=max(self.contact_leading, self.contact_font_size + 1.2),
             textColor=self.palette.text_color,
         )
         row_para = Paragraph(row_markup, row_style)
@@ -1069,7 +1270,8 @@ class _HackajobRenderer:
     def _measure_card_title(self, title: str, content_width: float, with_icon: bool = True) -> float:
         para, para_h = _measure_paragraph(title, self.section_title_style, max(content_width, 40))
         _ = para
-        return max(para_h, 14.0)
+        _ = with_icon
+        return max(para_h, self.section_leading)
 
     def _draw_card_title(
         self,
@@ -1086,7 +1288,7 @@ class _HackajobRenderer:
             max(content_width, 40),
         )
         para.drawOn(self.canvas, text_x, self._to_canvas_y(top, para_h))
-        return max(para_h, 14.0)
+        return max(para_h, self.section_leading)
 
     def _draw_logo_image(
         self,
@@ -1333,8 +1535,8 @@ class _HackajobRenderer:
                     "HackajobHeaderSmall",
                     parent=self.headline_style,
                     fontName=self.font_bold,
-                    fontSize=9,
-                    leading=11,
+                    fontSize=max(self.contact_font_size, 8.0),
+                    leading=max(self.contact_leading, self.contact_font_size + 1.3),
                 ),
                 90,
             )
@@ -1416,8 +1618,8 @@ class _HackajobRenderer:
         skills_style = ParagraphStyle(
             "HackajobSkillLine",
             parent=self.body_style,
-            fontSize=10.5,
-            leading=16,
+            fontSize=self.body_font_size,
+            leading=self.body_leading,
             textColor=self.palette.text_color,
         )
         rendered_lines: List[Tuple[Paragraph, float]] = []
@@ -1529,8 +1731,8 @@ class _HackajobRenderer:
             leftIndent=12,
             bulletIndent=0,
             bulletFontName=self.font_bullet,
-            bulletFontSize=7.0,
-            leading=13,
+            bulletFontSize=self.bullet_font_size,
+            leading=self.compact_body_leading,
         )
         for bullet in entry.bullets:
             bullet_para = Paragraph(
@@ -1790,8 +1992,8 @@ class _HackajobRenderer:
             leftIndent=12,
             bulletIndent=0,
             bulletFontName=self.font_bullet,
-            bulletFontSize=7.0,
-            leading=12,
+            bulletFontSize=self.bullet_font_size,
+            leading=self.list_leading,
         )
 
         bullet_rows: List[Tuple[Paragraph, float]] = []
@@ -1872,8 +2074,8 @@ class _HackajobRenderer:
             "HackajobNoticePeriodNote",
             parent=self.body_style,
             fontName=self.font_medium,
-            fontSize=9.0,
-            leading=11.0,
+            fontSize=self.contact_font_size,
+            leading=max(self.contact_leading, self.contact_font_size + 1.2),
             textColor=self.palette.text_muted,
         )
         if note.lower().startswith("note:"):
