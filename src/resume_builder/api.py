@@ -24,6 +24,7 @@ from . import (
     render_resume,
 )
 from .io_utils import load_profile, profile_to_canonical, save_profile
+from .latex_renderer import render_latex_resume
 from .models import ResumeDocument, ResumeProfile, ResumeSection, Theme
 from .profile_generator import build_profile_from_reference
 from .resume_text_parser import parse_resume_text
@@ -942,6 +943,7 @@ def _document_payload(
     document: ResumeDocument,
     pdf_bytes: bytes,
     ats_pdf_bytes: bytes | None = None,
+    latex_pdf_bytes: bytes | None = None,
 ) -> Dict[str, object]:
     payload: Dict[str, object] = {
         "resume_id": resume_id,
@@ -952,6 +954,8 @@ def _document_payload(
     }
     if ats_pdf_bytes:
         payload["ats_pdf"] = _encode_pdf(ats_pdf_bytes)
+    if latex_pdf_bytes:
+        payload["latex_pdf"] = _encode_pdf(latex_pdf_bytes)
     return payload
 
 
@@ -1116,7 +1120,7 @@ async def _persist_upload(upload: UploadFile, destination: Path) -> Path:
     return destination
 
 
-async def _render_document_pdfs(document: ResumeDocument) -> tuple[bytes, bytes]:
+async def _render_document_pdfs(document: ResumeDocument) -> tuple[bytes, bytes, bytes | None]:
     async with _temporary_workspace() as workspace:
         output_path = workspace.path("resume.pdf")
         render_resume(document, output_path)
@@ -1125,7 +1129,16 @@ async def _render_document_pdfs(document: ResumeDocument) -> tuple[bytes, bytes]
         ats_document = _build_ats_document(document)
         render_resume(ats_document, ats_output_path)
 
-        return output_path.read_bytes(), ats_output_path.read_bytes()
+        latex_bytes: bytes | None = None
+        latex_output_path = workspace.path("resume_latex.pdf")
+        try:
+            render_latex_resume(document, latex_output_path)
+            latex_bytes = latex_output_path.read_bytes()
+        except (FileNotFoundError, RuntimeError) as exc:
+            # Keep API backward-compatible when LaTeX is unavailable.
+            print(f"[latex-renderer] {exc}")
+
+        return output_path.read_bytes(), ats_output_path.read_bytes(), latex_bytes
 
 
 def _build_app() -> FastAPI:
@@ -1261,11 +1274,11 @@ def _build_app() -> FastAPI:
             except Exception as exc:  # pragma: no cover - defensive
                 raise HTTPException(status_code=500, detail="Failed to build resume.") from exc
 
-        pdf_bytes, ats_pdf_bytes = await _render_document_pdfs(document)
+        pdf_bytes, ats_pdf_bytes, latex_pdf_bytes = await _render_document_pdfs(document)
 
         resume_id = uuid4().hex
         RESUME_SESSIONS[resume_id] = document
-        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes)
+        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes, latex_pdf_bytes)
 
     @app.get("/api/resume/{resume_id}")
     async def get_resume(resume_id: str) -> Dict[str, object]:
@@ -1273,8 +1286,8 @@ def _build_app() -> FastAPI:
         if document is None:
             raise HTTPException(status_code=404, detail="Resume session not found.")
 
-        pdf_bytes, ats_pdf_bytes = await _render_document_pdfs(document)
-        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes)
+        pdf_bytes, ats_pdf_bytes, latex_pdf_bytes = await _render_document_pdfs(document)
+        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes, latex_pdf_bytes)
 
     @app.post("/api/resume/import")
     async def import_resume(payload: UpdatePayload) -> Dict[str, object]:
@@ -1302,11 +1315,11 @@ def _build_app() -> FastAPI:
             imported_sections.append(section)
         document.sections = imported_sections
 
-        pdf_bytes, ats_pdf_bytes = await _render_document_pdfs(document)
+        pdf_bytes, ats_pdf_bytes, latex_pdf_bytes = await _render_document_pdfs(document)
 
         resume_id = uuid4().hex
         RESUME_SESSIONS[resume_id] = document
-        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes)
+        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes, latex_pdf_bytes)
 
     @app.put("/api/resume/{resume_id}")
     async def update_resume(resume_id: str, payload: UpdatePayload) -> Dict[str, object]:
@@ -1367,10 +1380,10 @@ def _build_app() -> FastAPI:
 
         _normalize_profile_headline(document.profile)
 
-        pdf_bytes, ats_pdf_bytes = await _render_document_pdfs(document)
+        pdf_bytes, ats_pdf_bytes, latex_pdf_bytes = await _render_document_pdfs(document)
 
         RESUME_SESSIONS[resume_id] = document
-        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes)
+        return _document_payload(resume_id, document, pdf_bytes, ats_pdf_bytes, latex_pdf_bytes)
 
     @app.get("/api/resume/{resume_id}/pdf")
     async def download_resume(resume_id: str) -> StreamingResponse:
@@ -1378,12 +1391,34 @@ def _build_app() -> FastAPI:
         if document is None:
             raise HTTPException(status_code=404, detail="Resume session not found.")
 
-        pdf_bytes, _ = await _render_document_pdfs(document)
+        pdf_bytes, _, _ = await _render_document_pdfs(document)
 
         return StreamingResponse(
             BytesIO(pdf_bytes),
             media_type="application/pdf",
             headers={"Content-Disposition": 'attachment; filename=\"resume.pdf\"'},
+        )
+
+    @app.get("/api/resume/{resume_id}/latex-pdf")
+    async def download_latex_resume(resume_id: str) -> StreamingResponse:
+        document = RESUME_SESSIONS.get(resume_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Resume session not found.")
+
+        async with _temporary_workspace() as workspace:
+            latex_output_path = workspace.path("resume_latex.pdf")
+            try:
+                render_latex_resume(document, latex_output_path)
+            except FileNotFoundError as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except RuntimeError as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+            latex_bytes = latex_output_path.read_bytes()
+
+        return StreamingResponse(
+            BytesIO(latex_bytes),
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename=\"resume-latex.pdf\"'},
         )
 
     return app

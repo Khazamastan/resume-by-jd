@@ -143,6 +143,13 @@ _TENURE_SUFFIX_PATTERN = re.compile(
     r"\s*\((?:[^)]*\b(?:yr|yrs|year|years|mo|mos|month|months)\b[^)]*)\)\s*$",
     re.IGNORECASE,
 )
+_EXPERIENCE_COMPANY_PREFIX_PATTERN = re.compile(r"^(?:company|organization|organisation|employer)\s*:\s*", re.IGNORECASE)
+_EXPERIENCE_ROLE_PREFIX_PATTERN = re.compile(r"^(?:role|title|position)\s*:\s*", re.IGNORECASE)
+_EXPERIENCE_LOCATION_PREFIX_PATTERN = re.compile(r"^(?:location|loc)\s*:\s*", re.IGNORECASE)
+_EXPERIENCE_DATE_PREFIX_PATTERN = re.compile(
+    r"^(?:timeline|duration|date|dates|tenure|period)\s*:\s*",
+    re.IGNORECASE,
+)
 _PAGE_FOOTER_PATTERN = re.compile(r"^.+\s*-\s*page\s+\d+\s+of\s+\d+\s*$", re.IGNORECASE)
 _PHONE_PATTERN = re.compile(r"\+?\d[\d\s\-()]{6,}")
 _INVISIBLE_CHARS_PATTERN = re.compile(
@@ -302,10 +309,18 @@ def _is_noise_line(value: str) -> bool:
     return bool(_PAGE_FOOTER_PATTERN.fullmatch(normalized))
 
 
+def _strip_prefixed_label(value: str, pattern: re.Pattern[str]) -> str:
+    candidate = _normalize_line(value)
+    if not candidate:
+        return ""
+    return _normalize_line(pattern.sub("", candidate, count=1))
+
+
 def _clean_date_range_text(value: str) -> str:
     candidate = _normalize_line(value)
     if not candidate:
         return ""
+    candidate = _strip_prefixed_label(candidate, _EXPERIENCE_DATE_PREFIX_PATTERN)
     return _normalize_line(_TENURE_SUFFIX_PATTERN.sub("", candidate))
 
 
@@ -630,6 +645,59 @@ def _parse_company_role_line(value: str) -> tuple[str, str] | None:
     return company, role
 
 
+def _parse_company_role_date_line(value: str) -> tuple[str, str, str, str] | None:
+    if "|" not in value:
+        return None
+    parts = [_normalize_line(part) for part in value.split("|") if _normalize_line(part)]
+    if len(parts) < 3:
+        return None
+
+    date_range = _clean_date_range_text(parts[-1])
+    if not _looks_like_date_range_text(date_range):
+        return None
+
+    leading_parts = parts[:-1]
+    location = ""
+    normalized_location = _strip_prefixed_label(leading_parts[-1], _EXPERIENCE_LOCATION_PREFIX_PATTERN)
+    if len(leading_parts) >= 3 and _looks_like_location_text(normalized_location):
+        location = normalized_location
+        leading_parts = leading_parts[:-1]
+    if len(leading_parts) < 2:
+        return None
+
+    first = _strip_prefixed_label(leading_parts[0], _EXPERIENCE_COMPANY_PREFIX_PATTERN)
+    second = " | ".join(leading_parts[1:]) if len(leading_parts) > 2 else leading_parts[1]
+    second = _strip_prefixed_label(second, _EXPERIENCE_ROLE_PREFIX_PATTERN)
+    if not first or not second:
+        return None
+    if _looks_like_date_range_text(first) or _looks_like_date_range_text(second):
+        return None
+    if _looks_like_award_line(first) or _looks_like_award_line(second):
+        return None
+    if _looks_like_degree_text(first) and _looks_like_institution(second):
+        return None
+    if _looks_like_institution(first) and _looks_like_degree_text(second):
+        return None
+
+    first_is_company = _looks_like_company_text(first)
+    second_is_company = _looks_like_company_text(second)
+    first_is_role = _looks_like_role_text(first)
+    second_is_role = _looks_like_role_text(second)
+
+    if first_is_company and not second_is_company:
+        company, role = first, second
+    elif second_is_company and not first_is_company:
+        company, role = second, first
+    elif first_is_role and not second_is_role:
+        role, company = first, second
+    elif second_is_role and not first_is_role:
+        role, company = second, first
+    else:
+        company, role = first, second
+
+    return company, role, location, date_range
+
+
 def _parse_company_role_delimited_line(value: str) -> tuple[str, str] | None:
     candidate = _normalize_line(value)
     if not candidate:
@@ -912,9 +980,31 @@ def _extract_experience(lines: List[str]) -> List[Dict[str, object]]:
             value = _normalize_line(line.split(":", 1)[1])
             parts = [_normalize_line(part) for part in value.split("|") if _normalize_line(part)]
             if parts:
-                current["company"] = parts[0]
+                current["company"] = _strip_prefixed_label(parts[0], _EXPERIENCE_COMPANY_PREFIX_PATTERN)
             if len(parts) > 1:
-                current["role"] = parts[1]
+                current["role"] = _strip_prefixed_label(parts[1], _EXPERIENCE_ROLE_PREFIX_PATTERN)
+            for part in parts[2:]:
+                if not part:
+                    continue
+                normalized_part = _normalize_line(part)
+                normalized_location = _strip_prefixed_label(normalized_part, _EXPERIENCE_LOCATION_PREFIX_PATTERN)
+                if normalized_location != normalized_part:
+                    if normalized_location and not current.get("location"):
+                        current["location"] = normalized_location
+                    continue
+
+                if _EXPERIENCE_DATE_PREFIX_PATTERN.match(normalized_part):
+                    date_value = _clean_date_range_text(normalized_part)
+                    if date_value:
+                        current["date_range"] = date_value
+                    continue
+
+                if not current.get("date_range") and _looks_like_date_range_text(normalized_part):
+                    current["date_range"] = _clean_date_range_text(normalized_part)
+                    continue
+                if not current.get("location") and _looks_like_location_text(normalized_part):
+                    current["location"] = normalized_location
+                    continue
             index += 1
             continue
 
@@ -952,6 +1042,17 @@ def _extract_experience(lines: List[str]) -> List[Dict[str, object]]:
             flush_current()
             company, role = company_role_delimited
             current = _new_entry(role=role, company=company)
+            index += 1
+            continue
+
+        company_role_date = _parse_company_role_date_line(line)
+        if company_role_date:
+            flush_current()
+            company, role, location, date_range = company_role_date
+            current = _new_entry(role=role, company=company)
+            if location:
+                current["location"] = location
+            current["date_range"] = date_range
             index += 1
             continue
 
@@ -1036,6 +1137,17 @@ def _extract_experience(lines: List[str]) -> List[Dict[str, object]]:
 
     flush_current()
     return entries
+
+
+def _backfill_experience_location(entries: List[Dict[str, object]], fallback_location: str) -> None:
+    location = _normalize_line(fallback_location)
+    if not location:
+        return
+    for entry in entries:
+        current = _normalize_line(str(entry.get("location", "")))
+        if current:
+            continue
+        entry["location"] = location
 
 
 def _split_education_and_awards_lines(lines: List[str]) -> tuple[List[str], List[str]]:
@@ -1149,6 +1261,7 @@ def parse_resume_text(text: str) -> tuple[ResumeProfile, List[ResumeSection]]:
 
     if not experience_entries:
         experience_entries = _extract_experience(inference_source_lines)
+    _backfill_experience_location(experience_entries, contact.get("location", ""))
 
     if not flattened_skills:
         inferred_skill_lines = _infer_skill_lines(inference_source_lines)

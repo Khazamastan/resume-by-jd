@@ -25,6 +25,7 @@ import { EditResumeModal } from '@/features/editor/components/EditResumeModal';
 import {
   buildAtsDownloadName,
   buildDownloadName,
+  buildLatexDownloadName,
   defaultSampleProfileId,
   GenerateResumeParams,
 } from '@/features/generator/api';
@@ -251,6 +252,7 @@ export default function App() {
   const [isGenerateButtonLoading, setIsGenerateButtonLoading] = useState(false);
   const pdfUrl = usePdfUrl(session?.pdf ?? null);
   const atsPdfUrl = usePdfUrl(session?.ats_pdf ?? null);
+  const latexPdfUrl = usePdfUrl(session?.latex_pdf ?? null);
 
   useEffect(() => {
     if (generateError) {
@@ -371,6 +373,7 @@ export default function App() {
 
   const downloadName = buildDownloadName(session?.profile?.name);
   const atsDownloadName = buildAtsDownloadName(session?.profile?.name);
+  const latexDownloadName = buildLatexDownloadName(session?.profile?.name);
   const hasSession = Boolean(session);
   const generatorFormId = 'generator-form';
 
@@ -387,6 +390,17 @@ export default function App() {
     }
     window.open(atsPdfUrl, '_blank', 'noopener,noreferrer');
   }, [atsPdfUrl]);
+
+  const handleOpenLatexNewTab = useCallback(() => {
+    if (latexPdfUrl) {
+      window.open(latexPdfUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (!session?.resume_id) {
+      return;
+    }
+    window.open(`/api/resume/${session.resume_id}/latex-pdf`, '_blank', 'noopener,noreferrer');
+  }, [latexPdfUrl, session?.resume_id]);
 
   const handleDownload = useCallback(() => {
     if (!pdfUrl) {
@@ -407,6 +421,16 @@ export default function App() {
     anchor.download = atsDownloadName;
     anchor.click();
   }, [atsDownloadName, atsPdfUrl]);
+
+  const handleDownloadLatex = useCallback(() => {
+    if (!session?.resume_id && !latexPdfUrl) {
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = latexPdfUrl ?? `/api/resume/${session?.resume_id}/latex-pdf`;
+    anchor.download = latexDownloadName;
+    anchor.click();
+  }, [latexDownloadName, latexPdfUrl, session?.resume_id]);
 
   return (
     <Flex direction="column" minH="100vh" bgGradient="linear(to-b, surface.canvas, surface.subtle)">
@@ -481,6 +505,15 @@ export default function App() {
                 Open ATS in new tab
               </Button>
               <Button
+                leftIcon={<Icon as={FiExternalLink} />}
+                variant="ghost"
+                colorScheme="gray"
+                onClick={handleOpenLatexNewTab}
+                isDisabled={!session?.resume_id}
+              >
+                Open LaTeX in new tab
+              </Button>
+              <Button
                 leftIcon={<Icon as={FiDownload} />}
                 colorScheme="brand"
                 variant="outline"
@@ -497,6 +530,15 @@ export default function App() {
                 isDisabled={!atsPdfUrl}
               >
                 Download ATS
+              </Button>
+              <Button
+                leftIcon={<Icon as={FiDownload} />}
+                colorScheme="brand"
+                variant="outline"
+                onClick={handleDownloadLatex}
+                isDisabled={!session?.resume_id}
+              >
+                Download LaTeX
               </Button>
             </HStack>
 

@@ -574,3 +574,72 @@ Tech Champion
 
     awards_section = next(section for section in sections if section.title == "Awards")
     assert all(not line.endswith("•") for line in awards_section.bullets)
+
+
+def test_parse_resume_text_supports_company_role_date_pipe_lines_and_backfills_location():
+    raw_resume = """
+Khazamastan Bellamkonda
+Principal Member Technical Staff | Full Stack Developer (AI & Generative Technologies)
+
+Location: Bangalore, India | Phone: +91-7207810602 | Email: khazamastan@gmail.com
+Notice Period: Currently Serving (LWD: May 5, 2026)
+
+Professional Experience
+Oracle | Principal Member Technical Staff | April 2022 – Present
+Developed an AI agent utilizing DevOps MCP to automatically triage build tickets.
+
+Xactly Corp | Senior Software Developer | June 2021 – April 2022
+Optimized frontend builds by migrating to Webpack with code splitting.
+"""
+
+    profile, sections = parse_resume_text(raw_resume)
+
+    assert profile.contact["location"] == "Bangalore, India"
+    assert profile.contact["phone"] == "+91-7207810602"
+    assert profile.contact["email"] == "khazamastan@gmail.com"
+    assert profile.contact["notice_note"] == "Currently Serving (LWD: May 5, 2026)"
+
+    experience_section = next(section for section in sections if section.title == "Professional Experience")
+    entries = experience_section.meta.get("entries", [])
+    assert len(entries) == 2
+
+    assert entries[0]["company"] == "Oracle"
+    assert entries[0]["role"] == "Principal Member Technical Staff"
+    assert entries[0]["date_range"] == "April 2022 – Present"
+    assert entries[0]["location"] == "Bangalore, India"
+
+    assert entries[1]["company"] == "Xactly Corp"
+    assert entries[1]["role"] == "Senior Software Developer"
+    assert entries[1]["date_range"] == "June 2021 – April 2022"
+    assert entries[1]["location"] == "Bangalore, India"
+
+    assert profile.experience[0]["start"] == "April 2022"
+    assert profile.experience[0]["end"] == "Present"
+    assert profile.headline == "Principal Member Technical Staff at Oracle"
+
+
+def test_parse_resume_text_supports_company_line_with_inline_timeline_and_location():
+    raw_resume = """
+Khazamastan Bellamkonda
+Principal Member Technical Staff
+
+Professional Experience
+Company: Minewhat Inc | Senior Front-End Developer | Bangalore, India | Timeline: August 2016 – July 2018
+Owned the user experience of an ML-driven recommendation platform.
+"""
+
+    profile, sections = parse_resume_text(raw_resume)
+
+    experience_section = next(section for section in sections if section.title == "Professional Experience")
+    entries = experience_section.meta.get("entries", [])
+    assert len(entries) == 1
+
+    assert entries[0]["company"] == "Minewhat Inc"
+    assert entries[0]["role"] == "Senior Front-End Developer"
+    assert entries[0]["location"] == "Bangalore, India"
+    assert entries[0]["date_range"] == "August 2016 – July 2018"
+    assert entries[0]["bullets"] == ["Owned the user experience of an ML-driven recommendation platform."]
+
+    assert len(profile.experience) == 1
+    assert profile.experience[0]["start"] == "August 2016"
+    assert profile.experience[0]["end"] == "July 2018"

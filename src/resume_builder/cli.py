@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 
 from . import io_utils
 from .jd_analyzer import analyze_job_description
+from .latex_renderer import render_latex_resume
 from .pdf_generator import render_resume
 from .profile_generator import build_profile_from_reference
 import yaml
@@ -21,6 +22,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--profile", help="Path to the structured resume profile (YAML or JSON).")
     parser.add_argument("--job-description", required=True, help="Path to the job description text file.")
     parser.add_argument("--output", required=True, help="Destination PDF path for the updated resume.")
+    parser.add_argument(
+        "--template",
+        choices=("reference", "standard", "ats", "hackajob", "latex"),
+        default="reference",
+        help="Rendering template override. Default keeps reference-inferred style.",
+    )
     parser.add_argument("--debug-dir", help="Optional directory to dump intermediate JSON artifacts.")
     return parser
 
@@ -76,7 +83,16 @@ def main(argv: List[str] | None = None) -> None:
     insights = analyze_job_description(job_description)
 
     document = build_resume_document(reference, profile, insights)
-    output_path = render_resume(document, args.output)
+    selected_template = (args.template or "reference").lower()
+    if selected_template == "standard":
+        document.theme.template = "standard"
+    elif selected_template in {"ats", "hackajob", "latex"}:
+        document.theme.template = selected_template
+
+    if selected_template == "latex":
+        output_path = render_latex_resume(document, args.output)
+    else:
+        output_path = render_resume(document, args.output)
 
     if args.debug_dir:
         _dump_reference_structure(reference, insights, Path(args.debug_dir))

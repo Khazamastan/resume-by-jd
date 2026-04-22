@@ -35,4 +35,5 @@ export interface ResumeDocumentPayload {
   theme: Record<string, unknown>;
   pdf: string; // base64 encoded
   ats_pdf?: string; // base64 encoded ATS-friendly plain resume
+  latex_pdf?: string; // base64 encoded LaTeX-rendered resume
 }

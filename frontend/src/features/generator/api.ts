@@ -114,6 +114,7 @@ export async function fetchResume(resumeId: string): Promise<ResumeDocumentPaylo
 
 const DEFAULT_DOWNLOAD_NAME = 'Khajamastan-Bellamkonda.pdf';
 const DEFAULT_ATS_DOWNLOAD_NAME = 'Khajamastan-Bellamkonda-ATS.pdf';
+const DEFAULT_LATEX_DOWNLOAD_NAME = 'Khajamastan-Bellamkonda-LaTeX.pdf';
 
 export function buildDownloadName(_profileName?: string) {
   return DEFAULT_DOWNLOAD_NAME;
@@ -121,4 +122,8 @@ export function buildDownloadName(_profileName?: string) {
 
 export function buildAtsDownloadName(_profileName?: string) {
   return DEFAULT_ATS_DOWNLOAD_NAME;
+}
+
+export function buildLatexDownloadName(_profileName?: string) {
+  return DEFAULT_LATEX_DOWNLOAD_NAME;
 }

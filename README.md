@@ -24,13 +24,15 @@ resume-by-jd \
   --reference path/to/reference_resume.pdf \
   --profile path/to/profile.yml \
   --job-description path/to/jd.txt \
-  --output output/resume.pdf
+  --output output/resume.pdf \
+  --template reference
 ```
 
 - `--reference`: PDF of your current resume, used to infer styling cues.
 - `--profile`: YAML or JSON file describing your structured resume data (experiences, projects, education, skills).
 - `--job-description`: Plain text job description.
 - `--output`: Path to the updated resume PDF.
+- `--template`: Optional renderer override: `reference` (default), `standard`, `ats`, `hackajob`, or `latex` (compiled with `pdflatex`; install MacTeX/TeX Live if unavailable).
 
 Use `--debug-dir` to emit intermediate artifacts (parsed structure JSON, skill extraction report) for inspection.
 

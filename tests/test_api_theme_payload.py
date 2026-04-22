@@ -1,7 +1,7 @@
 import pytest
 
 from resume_builder import api as api_module
-from resume_builder.models import ResumeProfile, ResumeSection, Theme
+from resume_builder.models import ResumeDocument, ResumeProfile, ResumeSection, Theme
 from resume_builder.resume_text_parser import parse_resume_text
 
 
@@ -253,6 +253,26 @@ def test_backfill_missing_awards_from_profile_adds_awards_when_resume_text_omits
     assert parsed_profile.additional_sections
     assert parsed_profile.additional_sections[0].title == "Awards"
     assert parsed_profile.additional_sections[0].bullets == ["Spot Award for Best Performance."]
+
+
+def test_document_payload_includes_latex_pdf_when_present():
+    document = ResumeDocument(
+        profile=ResumeProfile(name="Candidate"),
+        sections=[],
+        theme=Theme(),
+    )
+
+    payload = api_module._document_payload(
+        resume_id="resume-1",
+        document=document,
+        pdf_bytes=b"primary",
+        ats_pdf_bytes=b"ats",
+        latex_pdf_bytes=b"latex",
+    )
+
+    assert payload["pdf"] == api_module._encode_pdf(b"primary")
+    assert payload["ats_pdf"] == api_module._encode_pdf(b"ats")
+    assert payload["latex_pdf"] == api_module._encode_pdf(b"latex")
 
 
 def test_backfill_missing_awards_from_profile_does_not_override_existing_awards():

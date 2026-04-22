@@ -49,7 +49,7 @@ import {
   ResumeEditorFormValues,
   SectionKind,
 } from '@/features/editor/types/formTypes';
-import { buildAtsDownloadName, buildDownloadName } from '@/features/generator/api';
+import { buildAtsDownloadName, buildDownloadName, buildLatexDownloadName } from '@/features/generator/api';
 import type { ResumeDocumentPayload, ResumeProfile, ResumeSection } from '@/features/shared/types';
 import { usePdfUrl } from '@/features/shared/usePdfUrl';
 
@@ -257,8 +257,10 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
 
   const pdfUrl = usePdfUrl(session?.pdf ?? null);
   const atsPdfUrl = usePdfUrl(session?.ats_pdf ?? null);
+  const latexPdfUrl = usePdfUrl(session?.latex_pdf ?? null);
   const downloadName = buildDownloadName(session?.profile?.name);
   const atsDownloadName = buildAtsDownloadName(session?.profile?.name);
+  const latexDownloadName = buildLatexDownloadName(session?.profile?.name);
 
   const handleOpenNewTab = () => {
     if (!pdfUrl) {
@@ -272,6 +274,17 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
       return;
     }
     window.open(atsPdfUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleOpenLatexNewTab = () => {
+    if (latexPdfUrl) {
+      window.open(latexPdfUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (!session?.resume_id) {
+      return;
+    }
+    window.open(`/api/resume/${session.resume_id}/latex-pdf`, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownload = () => {
@@ -291,6 +304,16 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
     const anchor = document.createElement('a');
     anchor.href = atsPdfUrl;
     anchor.download = atsDownloadName;
+    anchor.click();
+  };
+
+  const handleDownloadLatex = () => {
+    if (!session?.resume_id && !latexPdfUrl) {
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = latexPdfUrl ?? `/api/resume/${session?.resume_id}/latex-pdf`;
+    anchor.download = latexDownloadName;
     anchor.click();
   };
 
@@ -833,6 +856,15 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
               </Button>
               <Button
                 variant="outline"
+                colorScheme="gray"
+                leftIcon={<Icon as={FiExternalLink} />}
+                onClick={handleOpenLatexNewTab}
+                isDisabled={!session?.resume_id}
+              >
+                Open LaTeX in new tab
+              </Button>
+              <Button
+                variant="outline"
                 colorScheme="brand"
                 leftIcon={<Icon as={FiDownload} />}
                 onClick={handleDownload}
@@ -848,6 +880,15 @@ export function EditResumeModal({ isOpen, onClose, session, onUpdated, isUpdatin
                 isDisabled={!atsPdfUrl}
               >
                 Download ATS
+              </Button>
+              <Button
+                variant="outline"
+                colorScheme="brand"
+                leftIcon={<Icon as={FiDownload} />}
+                onClick={handleDownloadLatex}
+                isDisabled={!session?.resume_id}
+              >
+                Download LaTeX
               </Button>
             </ButtonGroup>
 
